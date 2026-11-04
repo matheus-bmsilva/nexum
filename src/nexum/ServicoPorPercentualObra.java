@@ -12,7 +12,8 @@ public class ServicoPorPercentualObra extends Servico{
     private double custoTotalObra;
     private double percentual;
 
-    public ServicoPorPercentualObra(double custoTotalObra, double percentual){
+    public ServicoPorPercentualObra(int id, String descricao, String data, Padrao padrao, Cliente cliente, double imposto, double custoTotalObra, double percentual){
+        super(id, descricao, data, padrao, cliente, imposto);
         this.custoTotalObra = custoTotalObra;
         this.percentual = percentual;
     }
