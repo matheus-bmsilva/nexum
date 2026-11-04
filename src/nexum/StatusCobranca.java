@@ -9,7 +9,7 @@ package nexum;
  * @author kirit
  */
 public enum StatusCobranca {
-    EmAberto,
-    Pago,
-    Atrasado
+    EM_ABERTO,
+    PAGO,
+    ATRASADO
 }
