@@ -12,7 +12,8 @@ public class ServicoPorMetroQuadrado extends Servico{
     private double area;
     private double valorMetroQuadrado;
 
-    public ServicoPorMetroQuadrado(double area, double valorMetroQuadrado){
+    public ServicoPorMetroQuadrado(int id, String descricao, String data, Padrao padrao, Cliente cliente, double imposto, double area, double valorMetroQuadrado){
+        super(id, descricao, data, padrao, cliente, imposto);
         this.area = area;
         this.valorMetroQuadrado = valorMetroQuadrado;
     }
