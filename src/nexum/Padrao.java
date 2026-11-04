@@ -9,7 +9,7 @@ package nexum;
  * @author kirit
  */
 public enum Padrao {
-    Baixo,
-    Medio,
-    Alto
+    BAIXO,
+    MEDIO,
+    ALTO
 }
