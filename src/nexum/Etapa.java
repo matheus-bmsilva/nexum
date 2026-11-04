@@ -9,11 +9,11 @@ package nexum;
  * @author kirit
  */
 public enum Etapa {
-    Levantamento,
-    EstudoPreliminar,
-    Anteprojeto,
-    ProjetoLegal,
-    ProjetoExecutivo,
-    ExecucaoAcompanhamento
+    LEVANTAMENTO,
+    ESTUDO_PRELIMINAR,
+    ANTEPROJETO,
+    PROJETO_LEGAL,
+    PROJETO_EXECUTIVO,
+    EXECUCAO_ACOMPANHAMENTO
     
 }
