@@ -9,7 +9,7 @@ package nexum;
  * @author kirit
  */
 public enum StatusOrcamento {
-    Pendente,
-    Aprovado,
-    Recusado
+    PENDENTE,
+    APROVADO,
+    RECUSADO
 }
