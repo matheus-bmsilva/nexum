@@ -12,7 +12,8 @@ public class ServicoPorHora extends Servico{
     private double horasTrabalhadas;
     private double valorHora;
 
-    public ServicoPorHora(double horasTrabalhadas, double valorHora){
+    public ServicoPorHora(int id, String descricao, String data, Padrao padrao, Cliente cliente, double imposto, double horasTrabalhadas, double valorHora){
+        super(id, descricao, data, padrao, cliente, imposto);
         this.horasTrabalhadas = horasTrabalhadas;
         this.valorHora = valorHora;
     }
