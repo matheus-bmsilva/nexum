@@ -33,11 +33,11 @@ public class Servico {
         return id;
     }
 
-    public void setDescricao(Srting descricao){
+    public void setDescricao(String descricao){
         this.descricao = descricao;
     }
 
-    public int getDescricao(){
+    public String getDescricao(){
         return descricao;
     }
 
@@ -71,5 +71,9 @@ public class Servico {
 
     public double getImposto(){
         return imposto;
+    }
+
+    public double calcularValor() {
+        return 0.0;
     }
 }
