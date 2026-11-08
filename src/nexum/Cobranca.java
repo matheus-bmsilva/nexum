@@ -21,7 +21,7 @@ public class Cobranca {
         this.valor = valor;
         this.dataVencimento = dataVencimento;
         this.dataPagamento = dataPagamento;
-        this.statusCobranca = statusCobranca.EM_ABERTO;
+        this.statusCobranca = (statusCobranca != null) ? statusCobranca : StatusCobranca.EM_ABERTO;
         this.orcamento = orcamento;
     }
 
@@ -67,21 +67,27 @@ public class Cobranca {
         return statusCobranca;
     }
 
-     public void setOrcamento(Orcamento orcamento){
+    public void setOrcamento(Orcamento orcamento){
         this.orcamento = orcamento;
     }
 
     public Orcamento getOrcamento(){
-        return statusCobranca;
+        return orcamento;
     }
     
-    public void registrarPagamento(){
+    public void registrarPagamento(String dataPagamento){
         this.dataPagamento = dataPagamento;
-        this.statusCobranca = statusCobranca.PAGO;
+        this.statusCobranca = StatusCobranca.PAGO;
     }
 
-    public void gerarMensagemCobranca(){
-        String nomeCliente = this.orcamento.getCliente().getNome();
-        return "Olá, " + nomeCliente + "! Passando para te lembrar sobre o pagamento do seu serviço conosco, no valor de R$ " + this.valor + " para a data " + this.dataVencimento + ". Qualquer dúvida estamos à disposição!";
+    public void registrarPagamento(){
+        this.statusCobranca = StatusCobranca.PAGO;
+    }
+
+    public String gerarMensagemCobranca(){
+        String nomeCliente = (this.orcamento != null && this.orcamento.getCliente() != null)
+                ? this.orcamento.getCliente().getNome()
+                : "Cliente";
+        return "Olá, " + nomeCliente + "! Tudo bem? Segue o lembrete referente ao investimento previsto para a etapa do seu projeto de arquitetura, no valor de R$ " + this.valor + " com vencimento em " + this.dataVencimento + ". Qualquer dúvida, estamos à disposição!";
     }
 }

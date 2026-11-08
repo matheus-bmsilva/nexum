@@ -4,17 +4,37 @@
  */
 package nexum;
 
+import nexum.database.DatabaseInitializer;
+import nexum.web.NexumServer;
+
 /**
- *
- * @author kirit
+ * Ponto de entrada da aplicação Nexum.
  */
 public class Nexum {
+
+    public static final int DEFAULT_PORT = 8080;
 
     /**
      * @param args the command line arguments
      */
     public static void main(String[] args) {
-        // TODO code application logic here
+        System.out.println("Inicializando o Nexum - Gestão para Arquitetos...");
+        DatabaseInitializer.initialize();
+        System.out.println("Banco de dados SQLite inicializado com sucesso.");
+
+        int port = DEFAULT_PORT;
+        if (args != null && args.length > 0) {
+            try {
+                port = Integer.parseInt(args[0]);
+            } catch (NumberFormatException ignored) {
+            }
+        }
+
+        try {
+            NexumServer.start(port);
+        } catch (Exception e) {
+            System.err.println("Erro ao inicializar o servidor HTTP: " + e.getMessage());
+        }
     }
     
 }

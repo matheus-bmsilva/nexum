@@ -36,6 +36,6 @@ public class ServicoPorHora extends Servico{
 
     @Override
     public double calcularValor(){
-        return getValorHora * getHorasTrabalhadas;
+        return getValorHora() * getHorasTrabalhadas();
     }
 }

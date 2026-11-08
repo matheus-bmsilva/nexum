@@ -9,14 +9,30 @@ package nexum;
  * @author kirit
  */
 public class Cliente {
+    private int id;
     private String nome;
     private String cpf;
     private String whatsApp;
 
-    public Cliente(String nome, String cpf, String WhatsApp){
+    public Cliente(int id, String nome, String cpf, String whatsApp){
+        this.id = id;
         this.nome = nome;
         this.cpf = cpf;
         this.whatsApp = whatsApp;
+    }
+
+    public Cliente(String nome, String cpf, String whatsApp){
+        this.nome = nome;
+        this.cpf = cpf;
+        this.whatsApp = whatsApp;
+    }
+
+    public void setId(int id){
+        this.id = id;
+    }
+
+    public int getId(){
+        return id;
     }
 
     public void setNome(String nome){

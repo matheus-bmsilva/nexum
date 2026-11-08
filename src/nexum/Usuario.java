@@ -10,16 +10,33 @@ package nexum;
  */
 public class Usuario {
     
+    private int id;
     private String nome;
     private String senha;
     private String whatsApp;
     private String cnpj;
 
-    public Usuario(String nome, String senha, String WhatsApp, String cnpj){
+    public Usuario(int id, String nome, String senha, String whatsApp, String cnpj){
+        this.id = id;
         this.nome = nome;
         this.senha = senha;
         this.whatsApp = whatsApp;
         this.cnpj = cnpj;
+    }
+
+    public Usuario(String nome, String senha, String whatsApp, String cnpj){
+        this.nome = nome;
+        this.senha = senha;
+        this.whatsApp = whatsApp;
+        this.cnpj = cnpj;
+    }
+
+    public void setId(int id){
+        this.id = id;
+    }
+
+    public int getId(){
+        return id;
     }
 
     public void setNome(String nome){
