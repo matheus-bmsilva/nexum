@@ -15,6 +15,8 @@ public interface UsuarioRepository {
 
     Optional<Usuario> buscarPorCnpj(String cnpj);
 
+    Optional<Usuario> buscarPorEmail(String email);
+
     List<Usuario> listarTodos();
 
     void atualizar(Usuario usuario);

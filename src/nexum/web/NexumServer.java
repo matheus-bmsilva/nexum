@@ -29,6 +29,7 @@ public class NexumServer {
         server = HttpServer.create(new InetSocketAddress(port), 0);
 
         // Registro de rotas e controladores REST da API
+        server.createContext("/api/auth", new nexum.controller.AuthController());
         server.createContext("/api/clientes", new ClienteController());
         server.createContext("/api/servicos", new PrecificacaoController());
         server.createContext("/api/orcamentos", new OrcamentoController());

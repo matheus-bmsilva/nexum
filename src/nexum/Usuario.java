@@ -12,23 +12,30 @@ public class Usuario {
     
     private int id;
     private String nome;
+    private String email;
     private String senha;
     private String whatsApp;
     private String cnpj;
 
-    public Usuario(int id, String nome, String senha, String whatsApp, String cnpj){
+    public Usuario(int id, String nome, String email, String senha, String whatsApp, String cnpj) {
         this.id = id;
         this.nome = nome;
+        this.email = email;
         this.senha = senha;
         this.whatsApp = whatsApp;
         this.cnpj = cnpj;
     }
 
-    public Usuario(String nome, String senha, String whatsApp, String cnpj){
-        this.nome = nome;
-        this.senha = senha;
-        this.whatsApp = whatsApp;
-        this.cnpj = cnpj;
+    public Usuario(String nome, String email, String senha, String whatsApp, String cnpj) {
+        this(0, nome, email, senha, whatsApp, cnpj);
+    }
+
+    public Usuario(int id, String nome, String senha, String whatsApp, String cnpj) {
+        this(id, nome, "", senha, whatsApp, cnpj);
+    }
+
+    public Usuario(String nome, String senha, String whatsApp, String cnpj) {
+        this(0, nome, "", senha, whatsApp, cnpj);
     }
 
     public void setId(int id){
@@ -45,6 +52,14 @@ public class Usuario {
 
     public String getNome(){
         return nome;
+    }
+
+    public void setEmail(String email){
+        this.email = email;
+    }
+
+    public String getEmail(){
+        return email;
     }
 
     public void setSenha(String senha){

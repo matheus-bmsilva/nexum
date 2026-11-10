@@ -23,7 +23,13 @@ public class Nexum {
         System.out.println("Banco de dados SQLite inicializado com sucesso.");
 
         int port = DEFAULT_PORT;
-        if (args != null && args.length > 0) {
+        String portEnv = System.getenv("PORT");
+        if (portEnv != null && !portEnv.isBlank()) {
+            try {
+                port = Integer.parseInt(portEnv.trim());
+            } catch (NumberFormatException ignored) {
+            }
+        } else if (args != null && args.length > 0) {
             try {
                 port = Integer.parseInt(args[0]);
             } catch (NumberFormatException ignored) {

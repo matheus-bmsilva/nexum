@@ -1,0 +1,10 @@
+.git
+.gitignore
+.nbproject/private/
+build/
+dist/
+nbproject/
+database/*.db
+database/test*.db
+*.log
+*.tmp

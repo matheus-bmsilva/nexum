@@ -2,8 +2,47 @@
  * NEXUM — Aplicação Frontend Reativa e Assíncrona (Vanilla JS / Fetch API)
  */
 
+const TOKEN_KEY = 'nexum_auth_token';
+
+function getToken() {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+function setToken(token) {
+  localStorage.setItem(TOKEN_KEY, token);
+}
+
+function clearToken() {
+  localStorage.removeItem(TOKEN_KEY);
+}
+
+/**
+ * Fetch wrapper que anexa automaticamente o cabeçalho Authorization
+ * e intercepta erros 401 para redirecionar à tela de autenticação.
+ */
+async function authFetch(url, options = {}) {
+  const token = getToken();
+  const headers = options.headers ? { ...options.headers } : {};
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const mergedOptions = { ...options, headers };
+  const resp = await fetch(url, mergedOptions);
+
+  if (resp.status === 401) {
+    clearToken();
+    mostrarTelaAuth();
+    showToast('Sessão expirada. Por favor, acesse novamente.', 'error');
+  }
+
+  return resp;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
-  // Inicialização de componentes e dados
+  // Inicialização de componentes e eventos
+  initAuth();
   initTabs();
   initModalidadeSelector();
   initEtapasManager();
@@ -13,28 +52,242 @@ document.addEventListener('DOMContentLoaded', () => {
   initOrcamentos();
   initFinanceiro();
 
-  // Carregamento inicial de dados
+  // Preenche datas de hoje por padrão
+  const hoje = new Date().toISOString().split('T')[0];
+  const elDataServico = document.getElementById('servico-data');
+  if (elDataServico) elDataServico.value = hoje;
+  const elDataEmissao = document.getElementById('orcamento-data-emissao');
+  if (elDataEmissao) elDataEmissao.value = hoje;
+
+  // Vencimento padrão: +15 dias
+  const dataVenc = new Date();
+  dataVenc.setDate(dataVenc.getDate() + 15);
+  const elDataVenc = document.getElementById('cobranca-vencimento');
+  if (elDataVenc) elDataVenc.value = dataVenc.toISOString().split('T')[0];
+
+  // Verifica estado de autenticação inicial
+  verificarAutenticacao();
+});
+
+/* ==========================================================================
+   1. SISTEMA DE AUTENTICAÇÃO, ONBOARDING & PERFIL
+   ========================================================================== */
+function initAuth() {
+  const btnToggleLogin = document.getElementById('btn-toggle-login');
+  const btnToggleRegister = document.getElementById('btn-toggle-register');
+  const formLogin = document.getElementById('form-login');
+  const formRegister = document.getElementById('form-register');
+  const btnLogout = document.getElementById('btn-logout');
+  const btnAbrirPerfil = document.getElementById('btn-abrir-perfil');
+  const modalPerfil = document.getElementById('modal-perfil');
+  const btnFecharPerfil = document.getElementById('btn-fechar-modal-perfil');
+  const btnCancelarPerfil = document.getElementById('btn-cancelar-modal-perfil');
+  const formPerfil = document.getElementById('form-perfil');
+
+  // Alternância suave entre Login e Cadastro
+  if (btnToggleLogin && btnToggleRegister) {
+    btnToggleLogin.addEventListener('click', () => {
+      btnToggleLogin.classList.add('active');
+      btnToggleRegister.classList.remove('active');
+      formLogin.classList.remove('hidden');
+      formRegister.classList.add('hidden');
+    });
+
+    btnToggleRegister.addEventListener('click', () => {
+      btnToggleRegister.classList.add('active');
+      btnToggleLogin.classList.remove('active');
+      formRegister.classList.remove('hidden');
+      formLogin.classList.add('hidden');
+    });
+  }
+
+  // Submit Login
+  if (formLogin) {
+    formLogin.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const payload = {
+        identificador: document.getElementById('login-identificador').value,
+        senha: document.getElementById('login-senha').value
+      };
+
+      try {
+        const resp = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await resp.json();
+        if (!resp.ok) {
+          showToast(data.error || 'Erro ao efetuar login.', 'error');
+          return;
+        }
+
+        setToken(data.token);
+        mostrarPainelApp(data.usuario);
+        showToast(`Bem-vindo ao Nexum, ${data.usuario.nome}!`);
+        formLogin.reset();
+      } catch (err) {
+        showToast('Falha na comunicação: ' + err.message, 'error');
+      }
+    });
+  }
+
+  // Submit Registro
+  if (formRegister) {
+    formRegister.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const payload = {
+        nome: document.getElementById('reg-nome').value,
+        cnpj: document.getElementById('reg-cnpj').value,
+        email: document.getElementById('reg-email').value,
+        whatsApp: document.getElementById('reg-whatsapp').value,
+        senha: document.getElementById('reg-senha').value
+      };
+
+      try {
+        const resp = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await resp.json();
+        if (!resp.ok) {
+          showToast(data.error || 'Erro ao cadastrar escritório.', 'error');
+          return;
+        }
+
+        setToken(data.token);
+        mostrarPainelApp(data.usuario);
+        showToast(`Conta criada com sucesso! Bem-vindo, ${data.usuario.nome}.`);
+        formRegister.reset();
+      } catch (err) {
+        showToast('Falha na comunicação: ' + err.message, 'error');
+      }
+    });
+  }
+
+  // Logout
+  if (btnLogout) {
+    btnLogout.addEventListener('click', async () => {
+      try {
+        await authFetch('/api/auth/logout', { method: 'POST' });
+      } catch (ignored) {}
+      clearToken();
+      mostrarTelaAuth();
+      showToast('Sessão encerrada com sucesso.');
+    });
+  }
+
+  // Modal Perfil
+  if (btnAbrirPerfil && modalPerfil) {
+    btnAbrirPerfil.addEventListener('click', async () => {
+      try {
+        const resp = await authFetch('/api/auth/perfil');
+        if (!resp.ok) return;
+        const u = await resp.json();
+
+        document.getElementById('perfil-nome').value = u.nome || '';
+        document.getElementById('perfil-cnpj').value = u.cnpj || '';
+        document.getElementById('perfil-email').value = u.email || '';
+        document.getElementById('perfil-whatsapp').value = u.whatsApp || '';
+        document.getElementById('perfil-nova-senha').value = '';
+
+        modalPerfil.classList.remove('hidden');
+      } catch (err) {
+        showToast('Erro ao carregar dados do perfil.', 'error');
+      }
+    });
+
+    const fecharPerfil = () => modalPerfil.classList.add('hidden');
+    if (btnFecharPerfil) btnFecharPerfil.addEventListener('click', fecharPerfil);
+    if (btnCancelarPerfil) btnCancelarPerfil.addEventListener('click', fecharPerfil);
+
+    if (formPerfil) {
+      formPerfil.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const payload = {
+          nome: document.getElementById('perfil-nome').value,
+          email: document.getElementById('perfil-email').value,
+          whatsApp: document.getElementById('perfil-whatsapp').value,
+          novaSenha: document.getElementById('perfil-nova-senha').value
+        };
+
+        try {
+          const resp = await authFetch('/api/auth/perfil', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+
+          const data = await resp.json();
+          if (!resp.ok) {
+            showToast(data.error || 'Erro ao atualizar perfil.', 'error');
+            return;
+          }
+
+          document.getElementById('user-display-name').textContent = data.nome;
+          showToast('Perfil atualizado com sucesso!');
+          fecharPerfil();
+        } catch (err) {
+          showToast('Falha ao atualizar perfil: ' + err.message, 'error');
+        }
+      });
+    }
+  }
+}
+
+async function verificarAutenticacao() {
+  const token = getToken();
+  if (!token) {
+    mostrarTelaAuth();
+    return;
+  }
+
+  try {
+    const resp = await authFetch('/api/auth/perfil');
+    if (resp.ok) {
+      const u = await resp.json();
+      mostrarPainelApp(u);
+    } else {
+      clearToken();
+      mostrarTelaAuth();
+    }
+  } catch (err) {
+    clearToken();
+    mostrarTelaAuth();
+  }
+}
+
+function mostrarPainelApp(usuario) {
+  document.getElementById('auth-section').classList.add('hidden');
+  document.getElementById('app-container').classList.remove('hidden');
+  document.getElementById('nav-user-panel').classList.remove('hidden');
+
+  if (usuario && usuario.nome) {
+    document.getElementById('user-display-name').textContent = usuario.nome;
+  }
+
+  // Carrega os dados operacionais das abas
   carregarClientes();
   carregarOrcamentos();
   carregarCobrancas();
   carregarExtrato();
+}
 
-  // Preenche datas de hoje por padrão
-  const hoje = new Date().toISOString().split('T')[0];
-  document.getElementById('servico-data').value = hoje;
-  document.getElementById('orcamento-data-emissao').value = hoje;
-  
-  // Vencimento padrão: +15 dias
-  const dataVenc = new Date();
-  dataVenc.setDate(dataVenc.getDate() + 15);
-  document.getElementById('cobranca-vencimento').value = dataVenc.toISOString().split('T')[0];
-});
+function mostrarTelaAuth() {
+  document.getElementById('app-container').classList.add('hidden');
+  document.getElementById('nav-user-panel').classList.add('hidden');
+  document.getElementById('auth-section').classList.remove('hidden');
+}
 
 /* ==========================================================================
-   1. SISTEMA DE NOTIFICAÇÕES (TOAST)
+   2. SISTEMA DE NOTIFICAÇÕES (TOAST)
    ========================================================================== */
 function showToast(mensagem, tipo = 'success') {
   const toast = document.getElementById('toast');
+  if (!toast) return;
   toast.textContent = mensagem;
   toast.className = `toast toast-${tipo}`;
   toast.classList.remove('hidden');
@@ -45,7 +298,7 @@ function showToast(mensagem, tipo = 'success') {
 }
 
 /* ==========================================================================
-   2. GERENCIAMENTO DE ABAS
+   3. GERENCIAMENTO DE ABAS
    ========================================================================== */
 function initTabs() {
   const tabButtons = document.querySelectorAll('.tab-btn');
@@ -58,7 +311,8 @@ function initTabs() {
 
       btn.classList.add('active');
       const targetId = btn.dataset.tab;
-      document.getElementById(targetId).classList.add('active');
+      const targetContent = document.getElementById(targetId);
+      if (targetContent) targetContent.classList.add('active');
 
       if (targetId === 'tab-clientes') carregarClientes();
       if (targetId === 'tab-orcamentos') carregarOrcamentos();
@@ -71,7 +325,7 @@ function initTabs() {
 }
 
 /* ==========================================================================
-   3. SELETOR DE MODALIDADE POLIMÓRFICA & CAMPOS DINÂMICOS
+   4. SELETOR DE MODALIDADE POLIMÓRFICA & CAMPOS DINÂMICOS
    ========================================================================== */
 function initModalidadeSelector() {
   const radios = document.querySelectorAll('input[name="modalidade"]');
@@ -95,7 +349,7 @@ function initModalidadeSelector() {
       const selecionado = paineis[radio.value];
       if (selecionado) {
         selecionado.el.classList.remove('hidden');
-        memoriaTipo.textContent = selecionado.label;
+        if (memoriaTipo) memoriaTipo.textContent = selecionado.label;
       }
       simularCalculo();
     });
@@ -103,11 +357,12 @@ function initModalidadeSelector() {
 }
 
 /* ==========================================================================
-   4. GERENCIAMENTO DE ETAPAS DINÂMICAS (SERVICO_POR_ETAPA)
+   5. GERENCIAMENTO DE ETAPAS DINÂMICAS (SERVICO_POR_ETAPA)
    ========================================================================== */
 function initEtapasManager() {
   const lista = document.getElementById('lista-etapas');
   const btnAdd = document.getElementById('btn-add-etapa');
+  if (!btnAdd || !lista) return;
 
   btnAdd.addEventListener('click', () => {
     const row = document.createElement('div');
@@ -122,7 +377,7 @@ function initEtapasManager() {
         <option value="EXECUCAO_ACOMPANHAMENTO">6. Execução e Acompanhamento</option>
       </select>
       <input type="number" class="etapa-valor" placeholder="Valor (R$)" step="50" min="0">
-      <button type="button" class="btn-remove-etapa" title="Remover etapa">Remover</button>
+      <button type="button" class="btn-remove-etapa" title="Remover etapa">&times;</button>
     `;
     lista.appendChild(row);
     row.querySelector('.btn-remove-etapa').addEventListener('click', () => {
@@ -132,7 +387,6 @@ function initEtapasManager() {
     row.querySelector('.etapa-valor').addEventListener('input', simularCalculo);
   });
 
-  // Listener para itens iniciais
   lista.querySelectorAll('.btn-remove-etapa').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.target.closest('.etapa-item-row').remove();
@@ -145,7 +399,8 @@ function initEtapasManager() {
 }
 
 /* ==========================================================================
-   5. CÁLCULO E SIMULAÇÃO DE HONORÁRIOS EM TEMPO REAL
+   6. CÁLCULO E SIMULAÇÃO DE HONORÁRIOS EM TEMPO REAL
+   (Sem botão redundante: cálculo automático instantâneo)
    ========================================================================== */
 function initCalculoSimulacao() {
   const inputsParaMonitorar = [
@@ -155,12 +410,11 @@ function initCalculoSimulacao() {
     const el = document.getElementById(id);
     if (el) el.addEventListener('input', simularCalculo);
   });
-
-  document.getElementById('btn-calcular').addEventListener('click', simularCalculo);
 }
 
 function coletarDadosModalidade() {
-  const modalidade = document.querySelector('input[name="modalidade"]:checked').value;
+  const radioChecked = document.querySelector('input[name="modalidade"]:checked');
+  const modalidade = radioChecked ? radioChecked.value : 'METRO_QUADRADO';
   const payload = { tipo: modalidade, imposto: 0.06 };
 
   if (modalidade === 'METRO_QUADRADO') {
@@ -191,7 +445,7 @@ async function simularCalculo() {
   const payload = coletarDadosModalidade();
 
   try {
-    const resp = await fetch('/api/servicos/calcular', {
+    const resp = await authFetch('/api/servicos/calcular', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -207,16 +461,21 @@ async function simularCalculo() {
 }
 
 function atualizarPainelMemoria(m) {
-  document.getElementById('memoria-base').textContent = formatarMoeda(m.valorBase || 0);
-  document.getElementById('memoria-imposto').textContent = formatarMoeda(m.valorImposto || 0);
-  document.getElementById('memoria-total').textContent = formatarMoeda(m.valorTotalFinal || 0);
+  const elBase = document.getElementById('memoria-base');
+  const elImposto = document.getElementById('memoria-imposto');
+  const elTotal = document.getElementById('memoria-total');
+  if (elBase) elBase.textContent = formatarMoeda(m.valorBase || 0);
+  if (elImposto) elImposto.textContent = formatarMoeda(m.valorImposto || 0);
+  if (elTotal) elTotal.textContent = formatarMoeda(m.valorTotalFinal || 0);
 }
 
 /* ==========================================================================
-   6. SALVAR SERVIÇO PRECIFICADO
+   7. SALVAR SERVIÇO PRECIFICADO
    ========================================================================== */
 function initFormServico() {
   const form = document.getElementById('form-servico');
+  if (!form) return;
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
@@ -233,7 +492,7 @@ function initFormServico() {
     payload.padrao = document.getElementById('servico-padrao').value;
 
     try {
-      const resp = await fetch('/api/servicos', {
+      const resp = await authFetch('/api/servicos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -246,7 +505,6 @@ function initFormServico() {
       }
 
       showToast('Serviço de arquitetura precificado e gravado com sucesso!');
-      // Abre modal de emissão de orçamento com esse serviço pré-selecionado
       abrirModalOrcamentoComServico(resData.id, payload.clienteId);
     } catch (err) {
       showToast('Falha na comunicação com o servidor: ' + err.message, 'error');
@@ -255,10 +513,12 @@ function initFormServico() {
 }
 
 /* ==========================================================================
-   7. GESTÃO DE CLIENTES
+   8. GESTÃO DE CLIENTES
    ========================================================================== */
 function initClientes() {
   const form = document.getElementById('form-cliente');
+  if (!form) return;
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
@@ -269,7 +529,7 @@ function initClientes() {
     };
 
     try {
-      const resp = await fetch('/api/clientes', {
+      const resp = await authFetch('/api/clientes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -292,7 +552,7 @@ function initClientes() {
 
 async function carregarClientes() {
   try {
-    const resp = await fetch('/api/clientes');
+    const resp = await authFetch('/api/clientes');
     if (!resp.ok) return;
 
     const clientes = await resp.json();
@@ -305,6 +565,8 @@ async function carregarClientes() {
 
 function renderTabelaClientes(clientes) {
   const tbody = document.getElementById('tabela-clientes-corpo');
+  if (!tbody) return;
+
   if (!clientes || clientes.length === 0) {
     tbody.innerHTML = '<tr><td colspan="4" class="text-center">Nenhum cliente cadastrado ainda.</td></tr>';
     return;
@@ -344,7 +606,7 @@ function atualizarDropdownsClientes(clientes) {
 async function deletarCliente(id) {
   if (!confirm('Deseja realmente remover este cliente?')) return;
   try {
-    const resp = await fetch(`/api/clientes/${id}`, { method: 'DELETE' });
+    const resp = await authFetch(`/api/clientes/${id}`, { method: 'DELETE' });
     if (resp.ok) {
       showToast('Cliente removido com sucesso.');
       carregarClientes();
@@ -358,7 +620,7 @@ async function deletarCliente(id) {
 }
 
 /* ==========================================================================
-   8. EMISSÃO DE ORÇAMENTOS & DISPARO WHATSAPP
+   9. EMISSÃO DE PROPOSTAS / ORÇAMENTOS & DISPARO WHATSAPP
    ========================================================================== */
 function initOrcamentos() {
   const btnAbrir = document.getElementById('btn-abrir-modal-orcamento');
@@ -367,58 +629,63 @@ function initOrcamentos() {
   const btnCancelar = document.getElementById('btn-cancelar-modal-orcamento');
   const form = document.getElementById('form-novo-orcamento');
 
-  btnAbrir.addEventListener('click', () => {
-    carregarServicosParaOrcamento();
-    modal.classList.remove('hidden');
-  });
+  if (btnAbrir && modal) {
+    btnAbrir.addEventListener('click', () => {
+      carregarServicosParaOrcamento();
+      modal.classList.remove('hidden');
+    });
 
-  const fechar = () => modal.classList.add('hidden');
-  btnFechar.addEventListener('click', fechar);
-  btnCancelar.addEventListener('click', fechar);
+    const fechar = () => modal.classList.add('hidden');
+    if (btnFechar) btnFechar.addEventListener('click', fechar);
+    if (btnCancelar) btnCancelar.addEventListener('click', fechar);
 
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const payload = {
-      clienteId: document.getElementById('orcamento-cliente-select').value,
-      servicoId: document.getElementById('orcamento-servico-select').value,
-      validade: document.getElementById('orcamento-validade').value,
-      dataEmissao: document.getElementById('orcamento-data-emissao').value
-    };
+    if (form) {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const payload = {
+          clienteId: document.getElementById('orcamento-cliente-select').value,
+          servicoId: document.getElementById('orcamento-servico-select').value,
+          validade: document.getElementById('orcamento-validade').value,
+          dataEmissao: document.getElementById('orcamento-data-emissao').value
+        };
 
-    try {
-      const resp = await fetch('/api/orcamentos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        try {
+          const resp = await authFetch('/api/orcamentos', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          const resData = await resp.json();
+          if (!resp.ok) {
+            showToast(resData.error || 'Erro ao emitir proposta.', 'error');
+            return;
+          }
+
+          showToast('Proposta emitida com sucesso!');
+          fechar();
+          carregarOrcamentos();
+
+          if (resData.whatsappUrl && confirm('Proposta emitida com sucesso! Deseja abrir o WhatsApp agora para enviar a proposta ao cliente?')) {
+            window.open(resData.whatsappUrl, '_blank');
+          }
+        } catch (err) {
+          showToast('Erro ao emitir proposta: ' + err.message, 'error');
+        }
       });
-      const resData = await resp.json();
-      if (!resp.ok) {
-        showToast(resData.error || 'Erro ao emitir proposta.', 'error');
-        return;
-      }
-
-      showToast('Proposta emitida com sucesso!');
-      fechar();
-      carregarOrcamentos();
-
-      // Se retornou link de WhatsApp, oferece para abrir imediatamente
-      if (resData.whatsappUrl && confirm('Proposta emitida com sucesso! Deseja abrir o WhatsApp agora para enviar a proposta ao cliente?')) {
-        window.open(resData.whatsappUrl, '_blank');
-      }
-    } catch (err) {
-      showToast('Erro ao emitir proposta: ' + err.message, 'error');
     }
-  });
+  }
 }
 
 async function carregarServicosParaOrcamento() {
   try {
-    const resp = await fetch('/api/servicos');
+    const resp = await authFetch('/api/servicos');
     if (!resp.ok) return;
     const servicos = await resp.json();
     const select = document.getElementById('orcamento-servico-select');
-    select.innerHTML = '<option value="">Selecione o serviço...</option>' +
-      servicos.map(s => `<option value="${s.id}">#${s.id} - ${escapeHtml(s.descricao)} (${formatarMoeda(s.valorTotal)})</option>`).join('');
+    if (select) {
+      select.innerHTML = '<option value="">Selecione o serviço...</option>' +
+        servicos.map(s => `<option value="${s.id}">#${s.id} - ${escapeHtml(s.descricao)} (${formatarMoeda(s.valorTotal)})</option>`).join('');
+    }
   } catch (err) {
     console.error('Erro ao carregar serviços:', err);
   }
@@ -427,14 +694,16 @@ async function carregarServicosParaOrcamento() {
 async function abrirModalOrcamentoComServico(servicoId, clienteId) {
   await carregarServicosParaOrcamento();
   const modal = document.getElementById('modal-orcamento');
-  document.getElementById('orcamento-cliente-select').value = clienteId;
-  document.getElementById('orcamento-servico-select').value = servicoId;
-  modal.classList.remove('hidden');
+  if (modal) {
+    document.getElementById('orcamento-cliente-select').value = clienteId;
+    document.getElementById('orcamento-servico-select').value = servicoId;
+    modal.classList.remove('hidden');
+  }
 }
 
 async function carregarOrcamentos() {
   try {
-    const resp = await fetch('/api/orcamentos');
+    const resp = await authFetch('/api/orcamentos');
     if (!resp.ok) return;
     const orcamentos = await resp.json();
     renderTabelaOrcamentos(orcamentos);
@@ -446,6 +715,8 @@ async function carregarOrcamentos() {
 
 function renderTabelaOrcamentos(orcamentos) {
   const tbody = document.getElementById('tabela-orcamentos-corpo');
+  if (!tbody) return;
+
   if (!orcamentos || orcamentos.length === 0) {
     tbody.innerHTML = '<tr><td colspan="9" class="text-center">Nenhuma proposta emitida até o momento.</td></tr>';
     return;
@@ -485,7 +756,7 @@ function renderTabelaOrcamentos(orcamentos) {
 
 async function abrirWhatsAppOrcamento(id) {
   try {
-    const resp = await fetch(`/api/orcamentos/${id}/whatsapp`);
+    const resp = await authFetch(`/api/orcamentos/${id}/whatsapp`);
     const data = await resp.json();
     if (data.whatsappUrl) {
       window.open(data.whatsappUrl, '_blank');
@@ -497,7 +768,7 @@ async function abrirWhatsAppOrcamento(id) {
 
 async function mudarStatusOrcamento(id, novoStatus) {
   try {
-    const resp = await fetch(`/api/orcamentos/${id}/status`, {
+    const resp = await authFetch(`/api/orcamentos/${id}/status`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: novoStatus })
@@ -515,7 +786,7 @@ async function mudarStatusOrcamento(id, novoStatus) {
 }
 
 /* ==========================================================================
-   9. FLUXO FINANCEIRO & COBRANÇAS
+   10. FLUXO FINANCEIRO & COBRANÇAS
    ========================================================================== */
 function initFinanceiro() {
   const btnAbrir = document.getElementById('btn-abrir-modal-cobranca');
@@ -524,44 +795,50 @@ function initFinanceiro() {
   const btnCancelar = document.getElementById('btn-cancelar-modal-cobranca');
   const form = document.getElementById('form-nova-cobranca');
 
-  btnAbrir.addEventListener('click', () => modal.classList.remove('hidden'));
-  const fechar = () => modal.classList.add('hidden');
-  btnFechar.addEventListener('click', fechar);
-  btnCancelar.addEventListener('click', fechar);
+  if (btnAbrir && modal) {
+    btnAbrir.addEventListener('click', () => modal.classList.remove('hidden'));
+    const fechar = () => modal.classList.add('hidden');
+    if (btnFechar) btnFechar.addEventListener('click', fechar);
+    if (btnCancelar) btnCancelar.addEventListener('click', fechar);
 
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const payload = {
-      orcamentoId: document.getElementById('cobranca-orcamento-select').value,
-      dataVencimento: document.getElementById('cobranca-vencimento').value
-    };
+    if (form) {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const payload = {
+          orcamentoId: document.getElementById('cobranca-orcamento-select').value,
+          dataVencimento: document.getElementById('cobranca-vencimento').value
+        };
 
-    try {
-      const resp = await fetch('/api/cobrancas', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        try {
+          const resp = await authFetch('/api/cobrancas', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          const resData = await resp.json();
+          if (!resp.ok) {
+            showToast(resData.error || 'Erro ao gerar cobrança.', 'error');
+            return;
+          }
+
+          showToast('Cobrança gerada com sucesso!');
+          fechar();
+          carregarCobrancas();
+          carregarExtrato();
+        } catch (err) {
+          showToast('Erro ao gerar cobrança: ' + err.message, 'error');
+        }
       });
-      const resData = await resp.json();
-      if (!resp.ok) {
-        showToast(resData.error || 'Erro ao gerar cobrança.', 'error');
-        return;
-      }
-
-      showToast('Cobrança gerada com sucesso!');
-      fechar();
-      carregarCobrancas();
-      carregarExtrato();
-    } catch (err) {
-      showToast('Erro ao gerar cobrança: ' + err.message, 'error');
     }
-  });
+  }
 }
 
 function abrirModalCobrancaParaOrcamento(orcamentoId) {
   const modal = document.getElementById('modal-cobranca');
-  document.getElementById('cobranca-orcamento-select').value = orcamentoId;
-  modal.classList.remove('hidden');
+  if (modal) {
+    document.getElementById('cobranca-orcamento-select').value = orcamentoId;
+    modal.classList.remove('hidden');
+  }
 }
 
 function atualizarDropdownOrcamentos(orcamentos) {
@@ -576,17 +853,24 @@ function atualizarDropdownOrcamentos(orcamentos) {
 
 async function carregarExtrato() {
   try {
-    const resp = await fetch('/api/cobrancas/extrato');
+    const resp = await authFetch('/api/cobrancas/extrato');
     if (!resp.ok) return;
     const extrato = await resp.json();
 
-    document.getElementById('kpi-faturado').textContent = formatarMoeda(extrato.totalFaturado || 0);
-    document.getElementById('kpi-pagas-count').textContent = `${extrato.cobrancasPagas || 0} recebimentos`;
+    const elFat = document.getElementById('kpi-faturado');
+    if (elFat) elFat.textContent = formatarMoeda(extrato.totalFaturado || 0);
 
-    document.getElementById('kpi-em-aberto').textContent = formatarMoeda(extrato.totalEmAberto || 0);
-    document.getElementById('kpi-aberto-count').textContent = `${extrato.cobrancasEmAberto || 0} pendentes`;
+    const elPagas = document.getElementById('kpi-pagas-count');
+    if (elPagas) elPagas.textContent = `${extrato.cobrancasPagas || 0} recebimentos`;
 
-    document.getElementById('kpi-total-cobrancas').textContent = extrato.totalCobrancas || 0;
+    const elAberto = document.getElementById('kpi-em-aberto');
+    if (elAberto) elAberto.textContent = formatarMoeda(extrato.totalEmAberto || 0);
+
+    const elAbertoCount = document.getElementById('kpi-aberto-count');
+    if (elAbertoCount) elAbertoCount.textContent = `${extrato.cobrancasEmAberto || 0} pendentes`;
+
+    const elTotal = document.getElementById('kpi-total-cobrancas');
+    if (elTotal) elTotal.textContent = extrato.totalCobrancas || 0;
   } catch (err) {
     console.error('Erro ao carregar extrato:', err);
   }
@@ -594,7 +878,7 @@ async function carregarExtrato() {
 
 async function carregarCobrancas() {
   try {
-    const resp = await fetch('/api/cobrancas');
+    const resp = await authFetch('/api/cobrancas');
     if (!resp.ok) return;
     const cobrancas = await resp.json();
     renderTabelaCobrancas(cobrancas);
@@ -605,6 +889,8 @@ async function carregarCobrancas() {
 
 function renderTabelaCobrancas(cobrancas) {
   const tbody = document.getElementById('tabela-cobrancas-corpo');
+  if (!tbody) return;
+
   if (!cobrancas || cobrancas.length === 0) {
     tbody.innerHTML = '<tr><td colspan="8" class="text-center">Nenhum registro financeiro encontrado.</td></tr>';
     return;
@@ -631,7 +917,7 @@ function renderTabelaCobrancas(cobrancas) {
               <button class="btn btn-primary btn-sm" onclick="registrarPagamentoCobranca(${c.id})">Liquidar</button>
               <button class="btn btn-whatsapp btn-sm" onclick="abrirWhatsAppCobranca(${c.id})">Lembrete</button>
             ` : `
-              <span style="color:var(--color-success); font-weight:600; font-size:0.85rem; align-self:center;">Liquidado</span>
+              <span style="color:var(--success); font-weight:600; font-size:0.85rem; align-self:center;">Liquidado</span>
             `}
             <button class="btn btn-danger btn-sm" onclick="deletarCobranca(${c.id})">Excluir</button>
           </div>
@@ -644,7 +930,7 @@ function renderTabelaCobrancas(cobrancas) {
 async function registrarPagamentoCobranca(id) {
   const dataHoje = new Date().toISOString().split('T')[0];
   try {
-    const resp = await fetch(`/api/cobrancas/${id}/pagar`, {
+    const resp = await authFetch(`/api/cobrancas/${id}/pagar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ dataPagamento: dataHoje })
@@ -664,7 +950,7 @@ async function registrarPagamentoCobranca(id) {
 
 async function abrirWhatsAppCobranca(id) {
   try {
-    const resp = await fetch(`/api/cobrancas/${id}/whatsapp`);
+    const resp = await authFetch(`/api/cobrancas/${id}/whatsapp`);
     const data = await resp.json();
     if (data.whatsappUrl) {
       window.open(data.whatsappUrl, '_blank');
@@ -677,7 +963,7 @@ async function abrirWhatsAppCobranca(id) {
 async function deletarCobranca(id) {
   if (!confirm('Deseja realmente excluir este registro financeiro?')) return;
   try {
-    const resp = await fetch(`/api/cobrancas/${id}`, { method: 'DELETE' });
+    const resp = await authFetch(`/api/cobrancas/${id}`, { method: 'DELETE' });
     if (resp.ok) {
       showToast('Registro financeiro excluído com sucesso.');
       carregarCobrancas();
@@ -692,7 +978,7 @@ async function deletarCobranca(id) {
 }
 
 /* ==========================================================================
-   UTILITÁRIOS GERAIS
+   11. UTILITÁRIOS GERAIS
    ========================================================================== */
 function formatarMoeda(val) {
   return (val || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });

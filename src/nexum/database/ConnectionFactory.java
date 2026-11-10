@@ -13,7 +13,9 @@ import nexum.exception.DatabaseException;
  */
 public class ConnectionFactory {
 
-    private static final String DEFAULT_DB_PATH = "database/nexum.db";
+    private static final String DEFAULT_DB_PATH = (System.getenv("DATABASE_PATH") != null && !System.getenv("DATABASE_PATH").isBlank())
+            ? System.getenv("DATABASE_PATH").trim()
+            : "database/nexum.db";
     private static String dbPath = DEFAULT_DB_PATH;
 
     static {

@@ -659,3 +659,121 @@ select:focus {
   border-top: 1px solid var(--border);
   margin-top: 3.5rem;
 }
+
+/* ==========================================================================
+   ESTILOS DE AUTENTICAÇÃO, ONBOARDING E PERFIL
+   ========================================================================== */
+
+/* Navbar User Panel */
+.nav-user {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.user-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--neutral-800);
+}
+
+.btn-outline {
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  color: var(--neutral-700);
+}
+
+.btn-outline:hover {
+  background: var(--neutral-100);
+  border-color: var(--neutral-500);
+}
+
+.input-disabled {
+  background-color: var(--neutral-100);
+  cursor: not-allowed;
+  color: var(--neutral-500);
+}
+
+/* Auth Section */
+.auth-section {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: calc(85vh - 70px);
+  padding: 2rem 1rem;
+}
+
+.auth-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-modal);
+  width: 100%;
+  max-width: 440px;
+  padding: 2.25rem;
+}
+
+.auth-header {
+  text-align: center;
+  margin-bottom: 1.75rem;
+}
+
+.auth-brand-mark {
+  width: 46px;
+  height: 46px;
+  background: var(--neutral-900);
+  color: #ffffff;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  margin-bottom: 0.75rem;
+}
+
+.auth-header h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--neutral-900);
+  margin-bottom: 0.35rem;
+}
+
+.auth-header p {
+  font-size: 0.82rem;
+  color: var(--neutral-500);
+}
+
+.auth-toggle {
+  display: flex;
+  background: var(--neutral-100);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+  margin-bottom: 1.5rem;
+}
+
+.auth-toggle-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  padding: 0.55rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--neutral-500);
+  cursor: pointer;
+  border-radius: calc(var(--radius-sm) - 1px);
+  transition: all 0.2s ease;
+}
+
+.auth-toggle-btn.active {
+  background: var(--bg-card);
+  color: var(--neutral-900);
+  box-shadow: var(--shadow-subtle);
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+}
+

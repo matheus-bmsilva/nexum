@@ -11,6 +11,7 @@ import java.util.Optional;
 import nexum.Usuario;
 import nexum.database.ConnectionFactory;
 import nexum.exception.DatabaseException;
+import nexum.exception.ValidationException;
 import nexum.repository.UsuarioRepository;
 
 /**
@@ -20,14 +21,15 @@ public class SqliteUsuarioRepository implements UsuarioRepository {
 
     @Override
     public Usuario salvar(Usuario usuario) {
-        String sql = "INSERT INTO usuarios (nome, senha, whatsapp, cnpj) VALUES (?, ?, ?, ?)";
+        String sql = "INSERT INTO usuarios (nome, email, senha, whatsapp, cnpj) VALUES (?, ?, ?, ?, ?)";
         try (Connection conn = ConnectionFactory.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
             stmt.setString(1, usuario.getNome());
-            stmt.setString(2, usuario.getSenha());
-            stmt.setString(3, usuario.getWhatsApp());
-            stmt.setString(4, usuario.getCnpj());
+            stmt.setString(2, usuario.getEmail());
+            stmt.setString(3, usuario.getSenha());
+            stmt.setString(4, usuario.getWhatsApp());
+            stmt.setString(5, usuario.getCnpj());
 
             stmt.executeUpdate();
 
@@ -38,13 +40,16 @@ public class SqliteUsuarioRepository implements UsuarioRepository {
             }
             return usuario;
         } catch (SQLException e) {
+            if (e.getMessage() != null && e.getMessage().contains("UNIQUE")) {
+                throw new ValidationException("Violação de unicidade: CNPJ ou e-mail já cadastrado.", e);
+            }
             throw new DatabaseException("Erro ao salvar usuário no banco de dados.", e);
         }
     }
 
     @Override
     public Optional<Usuario> buscarPorId(int id) {
-        String sql = "SELECT id, nome, senha, whatsapp, cnpj FROM usuarios WHERE id = ?";
+        String sql = "SELECT id, nome, email, senha, whatsapp, cnpj FROM usuarios WHERE id = ?";
         try (Connection conn = ConnectionFactory.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
@@ -63,7 +68,7 @@ public class SqliteUsuarioRepository implements UsuarioRepository {
 
     @Override
     public Optional<Usuario> buscarPorCnpj(String cnpj) {
-        String sql = "SELECT id, nome, senha, whatsapp, cnpj FROM usuarios WHERE cnpj = ?";
+        String sql = "SELECT id, nome, email, senha, whatsapp, cnpj FROM usuarios WHERE cnpj = ?";
         try (Connection conn = ConnectionFactory.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
@@ -81,8 +86,30 @@ public class SqliteUsuarioRepository implements UsuarioRepository {
     }
 
     @Override
+    public Optional<Usuario> buscarPorEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return Optional.empty();
+        }
+        String sql = "SELECT id, nome, email, senha, whatsapp, cnpj FROM usuarios WHERE LOWER(email) = LOWER(?)";
+        try (Connection conn = ConnectionFactory.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, email.trim());
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(mapearUsuario(rs));
+                }
+            }
+            return Optional.empty();
+        } catch (SQLException e) {
+            throw new DatabaseException("Erro ao buscar usuário por e-mail.", e);
+        }
+    }
+
+    @Override
     public List<Usuario> listarTodos() {
-        String sql = "SELECT id, nome, senha, whatsapp, cnpj FROM usuarios ORDER BY nome ASC";
+        String sql = "SELECT id, nome, email, senha, whatsapp, cnpj FROM usuarios ORDER BY nome ASC";
         List<Usuario> usuarios = new ArrayList<>();
         try (Connection conn = ConnectionFactory.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql);
@@ -99,18 +126,22 @@ public class SqliteUsuarioRepository implements UsuarioRepository {
 
     @Override
     public void atualizar(Usuario usuario) {
-        String sql = "UPDATE usuarios SET nome = ?, senha = ?, whatsapp = ?, cnpj = ? WHERE id = ?";
+        String sql = "UPDATE usuarios SET nome = ?, email = ?, senha = ?, whatsapp = ?, cnpj = ? WHERE id = ?";
         try (Connection conn = ConnectionFactory.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setString(1, usuario.getNome());
-            stmt.setString(2, usuario.getSenha());
-            stmt.setString(3, usuario.getWhatsApp());
-            stmt.setString(4, usuario.getCnpj());
-            stmt.setInt(5, usuario.getId());
+            stmt.setString(2, usuario.getEmail());
+            stmt.setString(3, usuario.getSenha());
+            stmt.setString(4, usuario.getWhatsApp());
+            stmt.setString(5, usuario.getCnpj());
+            stmt.setInt(6, usuario.getId());
 
             stmt.executeUpdate();
         } catch (SQLException e) {
+            if (e.getMessage() != null && e.getMessage().contains("UNIQUE")) {
+                throw new ValidationException("Violação de unicidade ao atualizar dados: documento ou e-mail já em uso.", e);
+            }
             throw new DatabaseException("Erro ao atualizar dados do usuário.", e);
         }
     }
@@ -132,6 +163,7 @@ public class SqliteUsuarioRepository implements UsuarioRepository {
         return new Usuario(
             rs.getInt("id"),
             rs.getString("nome"),
+            rs.getString("email"),
             rs.getString("senha"),
             rs.getString("whatsapp"),
             rs.getString("cnpj")

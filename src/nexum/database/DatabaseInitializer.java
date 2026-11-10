@@ -25,6 +25,7 @@ public class DatabaseInitializer {
             CREATE TABLE IF NOT EXISTS usuarios (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 nome TEXT NOT NULL,
+                email TEXT,
                 senha TEXT NOT NULL,
                 whatsapp TEXT NOT NULL,
                 cnpj TEXT NOT NULL UNIQUE
@@ -103,6 +104,7 @@ public class DatabaseInitializer {
             // Índices para otimização de consultas e unicidade
             "CREATE INDEX IF NOT EXISTS idx_clientes_cpf ON clientes(cpf)",
             "CREATE INDEX IF NOT EXISTS idx_usuarios_cnpj ON usuarios(cnpj)",
+            "CREATE INDEX IF NOT EXISTS idx_usuarios_email ON usuarios(email)",
             "CREATE INDEX IF NOT EXISTS idx_servicos_cliente ON servicos(cliente_id)",
             "CREATE INDEX IF NOT EXISTS idx_itens_etapa_servico ON itens_etapa(servico_id)",
             "CREATE INDEX IF NOT EXISTS idx_orcamentos_cliente ON orcamentos(cliente_id)",
@@ -114,6 +116,13 @@ public class DatabaseInitializer {
 
             for (String sql : ddlStatements) {
                 stmt.execute(sql.trim());
+            }
+
+            // Migração defensiva: garante existência da coluna email em bancos pré-existentes
+            try {
+                stmt.execute("ALTER TABLE usuarios ADD COLUMN email TEXT;");
+            } catch (SQLException ignored) {
+                // Coluna já existe
             }
 
         } catch (SQLException e) {

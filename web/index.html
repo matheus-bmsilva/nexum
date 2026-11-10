@@ -21,324 +21,383 @@
           <span class="brand-subtitle">Gestão Técnica & Precificação</span>
         </div>
       </div>
-      <div class="nav-status">
-        <span class="status-indicator"></span>
-        <span>Sistema Operacional</span>
+      <div class="nav-user hidden" id="nav-user-panel">
+        <span class="user-name" id="user-display-name">Escritório</span>
+        <button class="btn btn-secondary btn-sm" id="btn-abrir-perfil">Meu Perfil</button>
+        <button class="btn btn-outline btn-sm" id="btn-logout">Sair</button>
       </div>
     </div>
   </header>
 
-  <main class="container">
-    <!-- Abas de Navegação Profissionais -->
-    <nav class="tabs-nav">
-      <button class="tab-btn active" data-tab="tab-calculadora">Precificação & Serviços</button>
-      <button class="tab-btn" data-tab="tab-clientes">Clientes</button>
-      <button class="tab-btn" data-tab="tab-orcamentos">Propostas Comerciais</button>
-      <button class="tab-btn" data-tab="tab-financeiro">Gestão Financeira</button>
-    </nav>
+  <!-- NOTIFICAÇÕES TOAST (Global) -->
+  <div id="toast" class="toast hidden"></div>
 
-    <!-- NOTIFICAÇÕES TOAST -->
-    <div id="toast" class="toast hidden"></div>
+  <!-- SEÇÃO DE AUTENTICAÇÃO (ONBOARDING COM ALTERNÂNCIA FLUIDA) -->
+  <section id="auth-section" class="auth-section">
+    <div class="auth-card">
+      <div class="auth-header">
+        <div class="auth-brand-mark">NX</div>
+        <h2>Acesso ao Sistema</h2>
+        <p>Plataforma de Gestão e Honorários para Arquitetura</p>
+      </div>
 
-    <!-- ABA 1: CALCULADORA DE PRECIFICAÇÃO POLIMÓRFICA -->
-    <section id="tab-calculadora" class="tab-content active">
-      <div class="grid-2">
-        <!-- Formulário de Precificação -->
-        <div class="card">
-          <div class="card-header">
-            <h2>Parametrização do Projeto</h2>
-            <p>Defina o escopo arquitetônico e selecione a modalidade de honorários.</p>
-          </div>
+      <div class="auth-toggle">
+        <button type="button" class="auth-toggle-btn active" id="btn-toggle-login">Entrar</button>
+        <button type="button" class="auth-toggle-btn" id="btn-toggle-register">Criar Conta</button>
+      </div>
 
-          <form id="form-servico">
-            <div class="form-group">
-              <label for="servico-cliente">Cliente *</label>
-              <select id="servico-cliente" required>
-                <option value="">Selecione um cliente cadastrado...</option>
-              </select>
+      <!-- Formulário de Login -->
+      <form id="form-login" class="auth-form">
+        <div class="form-group">
+          <label for="login-identificador">CNPJ ou E-mail *</label>
+          <input type="text" id="login-identificador" placeholder="Digite seu CNPJ ou E-mail profissional" required>
+        </div>
+        <div class="form-group">
+          <label for="login-senha">Senha *</label>
+          <input type="password" id="login-senha" placeholder="Sua senha de acesso" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Acessar o Nexum</button>
+      </form>
+
+      <!-- Formulário de Criação de Conta -->
+      <form id="form-register" class="auth-form hidden">
+        <div class="form-group">
+          <label for="reg-nome">Nome do Arquiteto ou Escritório *</label>
+          <input type="text" id="reg-nome" placeholder="Ex: Studio Nexus Arquitetura" required>
+        </div>
+        <div class="form-group">
+          <label for="reg-cnpj">CNPJ do Escritório *</label>
+          <input type="text" id="reg-cnpj" placeholder="00.000.000/0001-00" required>
+        </div>
+        <div class="form-group">
+          <label for="reg-email">E-mail Profissional *</label>
+          <input type="email" id="reg-email" placeholder="contato@nexus.arq.br" required>
+        </div>
+        <div class="form-group">
+          <label for="reg-whatsapp">WhatsApp / Celular Comercial *</label>
+          <input type="text" id="reg-whatsapp" placeholder="(11) 98765-4321" required>
+        </div>
+        <div class="form-group">
+          <label for="reg-senha">Senha de Acesso (mínimo 6 caracteres) *</label>
+          <input type="password" id="reg-senha" placeholder="Crie uma senha forte" minlength="6" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Criar Conta de Escritório</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- PAINEL PRINCIPAL DO SISTEMA (EXIBIDO APÓS AUTENTICAÇÃO) -->
+  <div id="app-container" class="hidden">
+    <main class="container">
+      <!-- Abas de Navegação Profissionais -->
+      <nav class="tabs-nav">
+        <button class="tab-btn active" data-tab="tab-calculadora">Precificação & Serviços</button>
+        <button class="tab-btn" data-tab="tab-clientes">Clientes</button>
+        <button class="tab-btn" data-tab="tab-orcamentos">Propostas Comerciais</button>
+        <button class="tab-btn" data-tab="tab-financeiro">Gestão Financeira</button>
+      </nav>
+
+      <!-- ABA 1: CALCULADORA DE PRECIFICAÇÃO POLIMÓRFICA -->
+      <section id="tab-calculadora" class="tab-content active">
+        <div class="grid-2">
+          <!-- Formulário de Precificação -->
+          <div class="card">
+            <div class="card-header">
+              <h2>Parametrização do Projeto</h2>
+              <p>Defina o escopo arquitetônico e selecione a modalidade de honorários.</p>
             </div>
 
-            <div class="form-group">
-              <label for="servico-descricao">Descrição do Projeto / Escopo *</label>
-              <input type="text" id="servico-descricao" placeholder="Ex: Projeto Residencial Unifamiliar 180m²" required>
-            </div>
-
-            <div class="grid-2-inputs">
+            <form id="form-servico">
               <div class="form-group">
-                <label for="servico-data">Data de Início *</label>
-                <input type="date" id="servico-data" required>
-              </div>
-              <div class="form-group">
-                <label for="servico-padrao">Padrão Construtivo</label>
-                <select id="servico-padrao">
-                  <option value="BAIXO">Padrão Baixo</option>
-                  <option value="MEDIO" selected>Padrão Médio</option>
-                  <option value="ALTO">Padrão Alto</option>
+                <label for="servico-cliente">Cliente *</label>
+                <select id="servico-cliente" required>
+                  <option value="">Selecione um cliente cadastrado...</option>
                 </select>
               </div>
-            </div>
 
-            <!-- Seletor de Modalidade Polimórfica Sóbrio -->
-            <div class="form-group">
-              <label>Modalidade de Cobrança</label>
-              <div class="modalidade-selector">
-                <label class="radio-card">
-                  <input type="radio" name="modalidade" value="METRO_QUADRADO" checked>
-                  <span>Metro Quadrado (m²)</span>
-                </label>
-                <label class="radio-card">
-                  <input type="radio" name="modalidade" value="ETAPA">
-                  <span>Etapas de Projeto</span>
-                </label>
-                <label class="radio-card">
-                  <input type="radio" name="modalidade" value="HORA">
-                  <span>Hora Técnica</span>
-                </label>
-                <label class="radio-card">
-                  <input type="radio" name="modalidade" value="PERCENTUAL_OBRA">
-                  <span>Percentual da Obra</span>
-                </label>
+              <div class="form-group">
+                <label for="servico-descricao">Descrição do Projeto / Escopo *</label>
+                <input type="text" id="servico-descricao" placeholder="Ex: Projeto Residencial Unifamiliar 180m²" required>
               </div>
-            </div>
 
-            <!-- Campos Dinâmicos: Metro Quadrado -->
-            <div id="campos-m2" class="campos-dinamicos">
               <div class="grid-2-inputs">
                 <div class="form-group">
-                  <label for="m2-area">Área Projetada (m²) *</label>
-                  <input type="number" id="m2-area" placeholder="Ex: 120" step="0.1" min="1">
+                  <label for="servico-data">Data de Início *</label>
+                  <input type="date" id="servico-data" required>
                 </div>
                 <div class="form-group">
-                  <label for="m2-valor">Valor por m² (R$) *</label>
-                  <input type="number" id="m2-valor" placeholder="Ex: 45.00" step="0.5" min="1">
-                </div>
-              </div>
-            </div>
-
-            <!-- Campos Dinâmicos: Etapas -->
-            <div id="campos-etapa" class="campos-dinamicos hidden">
-              <label>Etapas do Projeto de Arquitetura</label>
-              <div id="lista-etapas" class="lista-itens-etapas">
-                <div class="etapa-item-row">
-                  <select class="etapa-tipo">
-                    <option value="LEVANTAMENTO">1. Levantamento Cadastral</option>
-                    <option value="ESTUDO_PRELIMINAR" selected>2. Estudo Preliminar</option>
-                    <option value="ANTEPROJETO">3. Anteprojeto</option>
-                    <option value="PROJETO_LEGAL">4. Projeto Legal / Prefeitura</option>
-                    <option value="PROJETO_EXECUTIVO">5. Projeto Executivo Detalhado</option>
-                    <option value="EXECUCAO_ACOMPANHAMENTO">6. Execução e Acompanhamento</option>
+                  <label for="servico-padrao">Padrão Construtivo</label>
+                  <select id="servico-padrao">
+                    <option value="BAIXO">Padrão Baixo</option>
+                    <option value="MEDIO" selected>Padrão Médio</option>
+                    <option value="ALTO">Padrão Alto</option>
                   </select>
-                  <input type="number" class="etapa-valor" placeholder="Valor (R$)" step="50" min="0">
-                  <button type="button" class="btn-remove-etapa" title="Remover etapa">Remover</button>
                 </div>
               </div>
-              <button type="button" id="btn-add-etapa" class="btn btn-secondary btn-sm">+ Adicionar Etapa</button>
+
+              <!-- Seletor de Modalidade Polimórfica Sóbrio -->
+              <div class="form-group">
+                <label>Modalidade de Cobrança</label>
+                <div class="modalidade-selector">
+                  <label class="radio-card">
+                    <input type="radio" name="modalidade" value="METRO_QUADRADO" checked>
+                    <span>Metro Quadrado (m²)</span>
+                  </label>
+                  <label class="radio-card">
+                    <input type="radio" name="modalidade" value="ETAPA">
+                    <span>Etapas de Projeto</span>
+                  </label>
+                  <label class="radio-card">
+                    <input type="radio" name="modalidade" value="HORA">
+                    <span>Hora Técnica</span>
+                  </label>
+                  <label class="radio-card">
+                    <input type="radio" name="modalidade" value="PERCENTUAL_OBRA">
+                    <span>Percentual da Obra</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Painéis Dinâmicos por Modalidade -->
+              <!-- 1. Metro Quadrado -->
+              <div id="campos-m2" class="modalidade-panel">
+                <div class="grid-2-inputs">
+                  <div class="form-group">
+                    <label for="m2-area">Área Construída (m²) *</label>
+                    <input type="number" id="m2-area" placeholder="Ex: 120" step="0.5" min="1">
+                  </div>
+                  <div class="form-group">
+                    <label for="m2-valor">Valor por m² (R$) *</label>
+                    <input type="number" id="m2-valor" placeholder="Ex: 45.00" step="0.5" min="1">
+                  </div>
+                </div>
+              </div>
+
+              <!-- 2. Etapa -->
+              <div id="campos-etapa" class="modalidade-panel hidden">
+                <div class="etapas-header">
+                  <label>Etapas do Projeto Executivo</label>
+                  <button type="button" id="btn-add-etapa" class="btn btn-secondary btn-sm">+ Adicionar Etapa</button>
+                </div>
+                <div id="lista-etapas" class="etapas-lista">
+                  <div class="etapa-item-row">
+                    <select class="etapa-tipo">
+                      <option value="LEVANTAMENTO">1. Levantamento Cadastral</option>
+                      <option value="ESTUDO_PRELIMINAR">2. Estudo Preliminar</option>
+                      <option value="ANTEPROJETO">3. Anteprojeto</option>
+                      <option value="PROJETO_LEGAL">4. Projeto Legal / Prefeitura</option>
+                      <option value="PROJETO_EXECUTIVO" selected>5. Projeto Executivo Detalhado</option>
+                      <option value="EXECUCAO_ACOMPANHAMENTO">6. Execução e Acompanhamento</option>
+                    </select>
+                    <input type="number" class="etapa-valor" placeholder="Valor (R$)" step="50" min="0" value="3500">
+                    <button type="button" class="btn-remove-etapa" title="Remover etapa">&times;</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 3. Hora Técnica -->
+              <div id="campos-hora" class="modalidade-panel hidden">
+                <div class="grid-2-inputs">
+                  <div class="form-group">
+                    <label for="hora-horas">Horas Estimadas *</label>
+                    <input type="number" id="hora-horas" placeholder="Ex: 25" step="1" min="1">
+                  </div>
+                  <div class="form-group">
+                    <label for="hora-valor">Valor da Hora Técnica (R$) *</label>
+                    <input type="number" id="hora-valor" placeholder="Ex: 150.00" step="5" min="1">
+                  </div>
+                </div>
+              </div>
+
+              <!-- 4. Percentual de Obra -->
+              <div id="campos-perc" class="modalidade-panel hidden">
+                <div class="grid-2-inputs">
+                  <div class="form-group">
+                    <label for="perc-custo">Custo Total Previsto da Obra (R$) *</label>
+                    <input type="number" id="perc-custo" placeholder="Ex: 400000" step="1000" min="1">
+                  </div>
+                  <div class="form-group">
+                    <label for="perc-taxa">Taxa de Honorários (%) *</label>
+                    <input type="number" id="perc-taxa" placeholder="Ex: 5 para 5%" step="0.1" min="0.1" max="100">
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-actions">
+                <button type="submit" id="btn-salvar-servico" class="btn btn-primary">Salvar Serviço</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Painel de Memória de Cálculo -->
+          <div class="card card-accent">
+            <div class="card-header">
+              <h2>Memória de Cálculo</h2>
+              <p>Demonstrativo técnico e provisão tributária estimada (Simples/MEI 6%).</p>
             </div>
 
-            <!-- Campos Dinâmicos: Por Hora -->
-            <div id="campos-hora" class="campos-dinamicos hidden">
-              <div class="grid-2-inputs">
-                <div class="form-group">
-                  <label for="hora-horas">Horas Técnicas Estimadas *</label>
-                  <input type="number" id="hora-horas" placeholder="Ex: 40" step="1" min="1">
-                </div>
-                <div class="form-group">
-                  <label for="hora-valor">Valor da Hora Técnica (R$) *</label>
-                  <input type="number" id="hora-valor" placeholder="Ex: 150.00" step="5" min="1">
-                </div>
+            <div class="memoria-box">
+              <div class="memoria-row">
+                <span>Modalidade Selecionada</span>
+                <strong id="memoria-tipo">Metro Quadrado (m²)</strong>
+              </div>
+              <div class="memoria-row">
+                <span>Honorários Base</span>
+                <strong id="memoria-base">R$ 0,00</strong>
+              </div>
+              <div class="memoria-row">
+                <span>Provisão Tributária (6% DAS-MEI)</span>
+                <strong id="memoria-imposto">R$ 0,00</strong>
+              </div>
+              <hr class="divider">
+              <div class="memoria-row total">
+                <span>Valor Total da Proposta</span>
+                <strong id="memoria-total">R$ 0,00</strong>
               </div>
             </div>
 
-            <!-- Campos Dinâmicos: Percentual Obra -->
-            <div id="campos-perc" class="campos-dinamicos hidden">
-              <div class="grid-2-inputs">
-                <div class="form-group">
-                  <label for="perc-custo">Custo Estimado da Obra (R$) *</label>
-                  <input type="number" id="perc-custo" placeholder="Ex: 350000" step="1000" min="1000">
-                </div>
-                <div class="form-group">
-                  <label for="perc-taxa">Taxa de Honorários (%) *</label>
-                  <input type="number" id="perc-taxa" placeholder="Ex: 5 para 5%" step="0.1" min="0.1" max="100">
-                </div>
-              </div>
+            <div class="card-footer-info">
+              <p>O cálculo é atualizado automaticamente conforme as variáveis do projeto são inseridas. Ao salvar, uma proposta comercial vinculada poderá ser emitida de imediato.</p>
             </div>
-
-            <div class="form-actions">
-              <button type="button" id="btn-calcular" class="btn btn-secondary">Simular Cálculo</button>
-              <button type="submit" id="btn-salvar-servico" class="btn btn-primary">Salvar Serviço</button>
-            </div>
-          </form>
+          </div>
         </div>
+      </section>
 
-        <!-- Painel de Memória de Cálculo -->
-        <div class="card card-accent">
-          <div class="card-header">
-            <h2>Memória de Cálculo</h2>
-            <p>Demonstrativo técnico e provisão tributária estimada (Simples/MEI 6%).</p>
+      <!-- ABA 2: CADASTRO E LISTAGEM DE CLIENTES -->
+      <section id="tab-clientes" class="tab-content">
+        <div class="grid-3-1">
+          <div class="card">
+            <div class="card-header">
+              <h2>Clientes Cadastrados</h2>
+              <p>Gerencie os contratantes dos projetos arquitetônicos.</p>
+            </div>
+            <div class="table-container">
+              <table class="table" id="tabela-clientes">
+                <thead>
+                  <tr>
+                    <th>Nome</th>
+                    <th>CPF</th>
+                    <th>WhatsApp</th>
+                    <th>Ações</th>
+                  </tr>
+                </thead>
+                <tbody id="tabela-clientes-corpo">
+                  <tr><td colspan="4" class="text-center">Carregando clientes...</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
 
-          <div class="memoria-box">
-            <div class="memoria-row">
-              <span>Modalidade:</span>
-              <strong id="memoria-tipo">Metro Quadrado (m²)</strong>
+          <!-- Formulário Lateral Novo Cliente -->
+          <div class="card">
+            <div class="card-header">
+              <h2>Novo Cliente</h2>
+              <p>Cadastro com validação estrita de CPF.</p>
             </div>
-            <div class="memoria-row">
-              <span>Valor Base do Serviço:</span>
-              <span id="memoria-base" class="valor-destaque">R$ 0,00</span>
-            </div>
-            <div class="memoria-row">
-              <span>Provisão Tributária (6%):</span>
-              <span id="memoria-imposto">R$ 0,00</span>
-            </div>
-            <hr class="divider">
-            <div class="memoria-row memoria-total">
-              <span>Investimento Total Previsto:</span>
-              <span id="memoria-total" class="total-destaque">R$ 0,00</span>
-            </div>
-          </div>
-
-          <div class="card-notice">
-            <strong>Proposta Comercial:</strong> Ao salvar o serviço, o sistema gera a proposta técnica e a mensagem para envio direto ao cliente.
+            <form id="form-cliente">
+              <div class="form-group">
+                <label for="cliente-nome">Nome Completo *</label>
+                <input type="text" id="cliente-nome" placeholder="Ex: Roberto Andrade" required>
+              </div>
+              <div class="form-group">
+                <label for="cliente-cpf">CPF *</label>
+                <input type="text" id="cliente-cpf" placeholder="000.000.000-00" required>
+              </div>
+              <div class="form-group">
+                <label for="cliente-whatsapp">WhatsApp (com DDD) *</label>
+                <input type="text" id="cliente-whatsapp" placeholder="(11) 98888-7777" required>
+              </div>
+              <button type="submit" class="btn btn-primary btn-block">Cadastrar Cliente</button>
+            </form>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- ABA 2: CLIENTES -->
-    <section id="tab-clientes" class="tab-content">
-      <div class="grid-2">
+      <!-- ABA 3: PROPOSTAS COMERCIAIS & EMISSÃO DE ORÇAMENTOS -->
+      <section id="tab-orcamentos" class="tab-content">
         <div class="card">
-          <div class="card-header">
-            <h2>Novo Cliente</h2>
-            <p>Cadastre contatos para associação direta com projetos e propostas.</p>
+          <div class="card-header flex-between">
+            <div>
+              <h2>Propostas Comerciais Emitidas</h2>
+              <p>Histórico de orçamentos, status de aprovação e links de envio direto.</p>
+            </div>
+            <button class="btn btn-primary" id="btn-abrir-modal-orcamento">Nova Proposta</button>
           </div>
-          <form id="form-cliente">
-            <div class="form-group">
-              <label for="cliente-nome">Nome Completo *</label>
-              <input type="text" id="cliente-nome" placeholder="Ex: Mariana Castro" required>
-            </div>
-            <div class="form-group">
-              <label for="cliente-cpf">CPF *</label>
-              <input type="text" id="cliente-cpf" placeholder="000.000.000-00" required>
-            </div>
-            <div class="form-group">
-              <label for="cliente-whatsapp">WhatsApp (com DDD) *</label>
-              <input type="text" id="cliente-whatsapp" placeholder="(11) 98765-4321" required>
-            </div>
-            <button type="submit" class="btn btn-primary btn-block">Salvar Cliente</button>
-          </form>
-        </div>
-
-        <div class="card">
-          <div class="card-header">
-            <h2>Base de Clientes</h2>
-            <p>Registros sincronizados com o banco de dados.</p>
-          </div>
-          <div class="table-responsive">
-            <table class="data-table">
+          <div class="table-container">
+            <table class="table" id="tabela-orcamentos">
               <thead>
                 <tr>
-                  <th>Nome</th>
-                  <th>CPF</th>
-                  <th>WhatsApp</th>
+                  <th>#</th>
+                  <th>Cliente</th>
+                  <th>Serviço</th>
+                  <th>Emissão</th>
+                  <th>Validade</th>
+                  <th>Valor Total</th>
+                  <th>Status</th>
+                  <th>Envio</th>
                   <th>Ações</th>
                 </tr>
               </thead>
-              <tbody id="tabela-clientes-corpo">
-                <tr><td colspan="4" class="text-center">Carregando clientes...</td></tr>
+              <tbody id="tabela-orcamentos-corpo">
+                <tr><td colspan="9" class="text-center">Carregando orçamentos...</td></tr>
               </tbody>
             </table>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- ABA 3: ORÇAMENTOS & PROPOSTAS -->
-    <section id="tab-orcamentos" class="tab-content">
-      <div class="card">
-        <div class="card-header flex-between">
-          <div>
-            <h2>Propostas Comerciais</h2>
-            <p>Emissão, controle de validade e envio de propostas a clientes.</p>
+      <!-- ABA 4: GESTÃO FINANCEIRA & COBRANÇA -->
+      <section id="tab-financeiro" class="tab-content">
+        <!-- KPIs Financeiros -->
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <span class="kpi-label">Faturado / Recebido</span>
+            <strong class="kpi-value text-success" id="kpi-faturado">R$ 0,00</strong>
+            <span class="kpi-sub" id="kpi-pagas-count">0 recebimentos</span>
           </div>
-          <button id="btn-abrir-modal-orcamento" class="btn btn-primary">+ Nova Proposta</button>
-        </div>
-
-        <div class="table-responsive">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Cliente</th>
-                <th>Projeto / Escopo</th>
-                <th>Data Emissão</th>
-                <th>Validade</th>
-                <th>Valor Total</th>
-                <th>Status</th>
-                <th>Comunicação</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody id="tabela-orcamentos-corpo">
-              <tr><td colspan="9" class="text-center">Carregando propostas...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <!-- ABA 4: GESTÃO FINANCEIRA -->
-    <section id="tab-financeiro" class="tab-content">
-      <!-- Indicadores Financeiros (KPIs Sóbrios) -->
-      <div class="kpi-grid">
-        <div class="kpi-card kpi-success">
-          <span class="kpi-label">Total Liquidado</span>
-          <span id="kpi-faturado" class="kpi-value">R$ 0,00</span>
-          <span id="kpi-pagas-count" class="kpi-sub">0 recebimentos efetuados</span>
-        </div>
-        <div class="kpi-card kpi-warning">
-          <span class="kpi-label">Previsão a Receber</span>
-          <span id="kpi-em-aberto" class="kpi-value">R$ 0,00</span>
-          <span id="kpi-aberto-count" class="kpi-sub">0 pendentes de liquidação</span>
-        </div>
-        <div class="kpi-card kpi-info">
-          <span class="kpi-label">Cobranças Emitidas</span>
-          <span id="kpi-total-cobrancas" class="kpi-value">0</span>
-          <span class="kpi-sub">registros no total</span>
-        </div>
-      </div>
-
-      <div class="card mt-4">
-        <div class="card-header flex-between">
-          <div>
-            <h2>Controle de Recebíveis</h2>
-            <p>Acompanhamento de vencimentos, lembretes de investimento e conciliação.</p>
+          <div class="kpi-card">
+            <span class="kpi-label">Em Aberto / Previsto</span>
+            <strong class="kpi-value text-warning" id="kpi-em-aberto">R$ 0,00</strong>
+            <span class="kpi-sub" id="kpi-aberto-count">0 pendentes</span>
           </div>
-          <button id="btn-abrir-modal-cobranca" class="btn btn-secondary">+ Gerar Cobrança</button>
+          <div class="kpi-card">
+            <span class="kpi-label">Total de Cobranças</span>
+            <strong class="kpi-value" id="kpi-total-cobrancas">0</strong>
+            <span class="kpi-sub">Lançamentos no período</span>
+          </div>
         </div>
 
-        <div class="table-responsive">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Cliente</th>
-                <th>Proposta Ref.</th>
-                <th>Vencimento</th>
-                <th>Data Liquidação</th>
-                <th>Valor</th>
-                <th>Status</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody id="tabela-cobrancas-corpo">
-              <tr><td colspan="8" class="text-center">Carregando cobranças...</td></tr>
-            </tbody>
-          </table>
+        <div class="card">
+          <div class="card-header flex-between">
+            <div>
+              <h2>Controle de Recebimentos e Parcelas</h2>
+              <p>Acompanhe liquidações e envie notificações cordiais de investimento.</p>
+            </div>
+            <button class="btn btn-primary" id="btn-abrir-modal-cobranca">Registrar Cobrança</button>
+          </div>
+          <div class="table-container">
+            <table class="table" id="tabela-cobrancas">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Cliente</th>
+                  <th>Proposta</th>
+                  <th>Vencimento</th>
+                  <th>Pagamento</th>
+                  <th>Valor</th>
+                  <th>Status</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="tabela-cobrancas-corpo">
+                <tr><td colspan="8" class="text-center">Carregando registros...</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
-    </section>
-  </main>
+      </section>
+    </main>
+  </div>
 
   <!-- MODAL: NOVO ORÇAMENTO -->
   <div id="modal-orcamento" class="modal hidden">
@@ -399,6 +458,42 @@
         <div class="modal-actions">
           <button type="button" class="btn btn-secondary" id="btn-cancelar-modal-cobranca">Cancelar</button>
           <button type="submit" class="btn btn-primary">Registrar Cobrança</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: PERFIL DO USUÁRIO -->
+  <div id="modal-perfil" class="modal hidden">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>Perfil do Escritório</h3>
+        <button class="modal-close" id="btn-fechar-modal-perfil">&times;</button>
+      </div>
+      <form id="form-perfil">
+        <div class="form-group">
+          <label for="perfil-nome">Nome do Escritório / Arquiteto *</label>
+          <input type="text" id="perfil-nome" required>
+        </div>
+        <div class="form-group">
+          <label for="perfil-cnpj">CNPJ</label>
+          <input type="text" id="perfil-cnpj" readonly disabled class="input-disabled">
+        </div>
+        <div class="form-group">
+          <label for="perfil-email">E-mail Profissional</label>
+          <input type="email" id="perfil-email">
+        </div>
+        <div class="form-group">
+          <label for="perfil-whatsapp">WhatsApp</label>
+          <input type="text" id="perfil-whatsapp" required>
+        </div>
+        <div class="form-group">
+          <label for="perfil-nova-senha">Nova Senha (deixe em branco para manter a atual)</label>
+          <input type="password" id="perfil-nova-senha" placeholder="Nova senha (mínimo 6 caracteres)" minlength="6">
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="btn-cancelar-modal-perfil">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar Alterações</button>
         </div>
       </form>
     </div>

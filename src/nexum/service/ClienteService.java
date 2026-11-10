@@ -113,8 +113,6 @@ public class ClienteService {
     public static String sanitizarCpf(String cpf) {
         return DocumentoValidator.sanitizar(cpf);
     }
-        return (cpf != null) ? cpf.replaceAll("\\D", "") : "";
-    }
 
     public static String sanitizarTelefone(String whatsApp) {
         if (whatsApp == null) return "";

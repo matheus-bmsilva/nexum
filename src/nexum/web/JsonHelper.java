@@ -17,6 +17,7 @@ import nexum.ServicoPorEtapa;
 import nexum.ServicoPorHora;
 import nexum.ServicoPorMetroQuadrado;
 import nexum.ServicoPorPercentualObra;
+import nexum.Usuario;
 import nexum.repository.sqlite.ServicoFactory;
 import nexum.service.CobrancaService;
 import nexum.service.PrecificacaoService;
@@ -226,6 +227,18 @@ public class JsonHelper {
         return String.format(Locale.US,
             "{\"totalFaturado\": %.2f, \"totalEmAberto\": %.2f, \"totalCobrancas\": %d, \"cobrancasPagas\": %d, \"cobrancasEmAberto\": %d}",
             e.totalFaturado(), e.totalEmAberto(), e.totalCobrancas(), e.cobrancasPagas(), e.cobrancasEmAberto()
+        );
+    }
+
+    public static String usuarioToJson(Usuario u) {
+        if (u == null) return "null";
+        return String.format(Locale.US,
+            "{\"id\": %d, \"nome\": \"%s\", \"email\": \"%s\", \"whatsApp\": \"%s\", \"cnpj\": \"%s\"}",
+            u.getId(),
+            HttpHelper.escapeJson(u.getNome()),
+            HttpHelper.escapeJson(u.getEmail() != null ? u.getEmail() : ""),
+            HttpHelper.escapeJson(u.getWhatsApp() != null ? u.getWhatsApp() : ""),
+            HttpHelper.escapeJson(u.getCnpj() != null ? u.getCnpj() : "")
         );
     }
 }
