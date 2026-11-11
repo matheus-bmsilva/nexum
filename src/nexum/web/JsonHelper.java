@@ -160,10 +160,11 @@ public class JsonHelper {
         if (o == null) return "null";
         StringBuilder sb = new StringBuilder("{");
         sb.append(String.format(Locale.US,
-            "\"id\": %d, \"dataEmissao\": \"%s\", \"validade\": %d, \"valorTotal\": %.2f, \"statusOrcamento\": \"%s\"",
+            "\"id\": %d, \"dataEmissao\": \"%s\", \"validade\": %d, \"dataValidade\": \"%s\", \"valorTotal\": %.2f, \"statusOrcamento\": \"%s\"",
             o.getId(),
             HttpHelper.escapeJson(o.getDataEmissao()),
             o.getValidade(),
+            HttpHelper.escapeJson(o.calcularDataValidadeFormatada()),
             o.getValorTotal(),
             o.getStatusOrcamento() != null ? o.getStatusOrcamento().name() : "PENDENTE"
         ));
@@ -234,12 +235,13 @@ public class JsonHelper {
     public static String usuarioToJson(Usuario u) {
         if (u == null) return "null";
         return String.format(Locale.US,
-            "{\"id\": %d, \"nome\": \"%s\", \"email\": \"%s\", \"whatsApp\": \"%s\", \"cnpj\": \"%s\"}",
+            "{\"id\": %d, \"nome\": \"%s\", \"email\": \"%s\", \"whatsApp\": \"%s\", \"cnpj\": \"%s\", \"rbt12\": %.2f}",
             u.getId(),
             HttpHelper.escapeJson(u.getNome()),
             HttpHelper.escapeJson(u.getEmail() != null ? u.getEmail() : ""),
             HttpHelper.escapeJson(u.getWhatsApp() != null ? u.getWhatsApp() : ""),
-            HttpHelper.escapeJson(u.getCnpj() != null ? u.getCnpj() : "")
+            HttpHelper.escapeJson(u.getCnpj() != null ? u.getCnpj() : ""),
+            u.getRbt12()
         );
     }
 }

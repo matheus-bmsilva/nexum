@@ -62,11 +62,15 @@ public class CobrancaService {
         Orcamento orcamento = orcamentoRepository.buscarPorId(orcamentoId)
                 .orElseThrow(() -> new EntityNotFoundException("Orçamento não localizado para o ID: " + orcamentoId));
 
+        if (orcamento.getStatusOrcamento() == nexum.StatusOrcamento.RECUSADO) {
+            throw new ValidationException("Operação bloqueada: não é permitido gerar cobrança para uma proposta comercial recusada.");
+        }
+
         if (orcamento.getDataEmissao() != null && !orcamento.getDataEmissao().isBlank()) {
             try {
                 LocalDate emissao = LocalDate.parse(orcamento.getDataEmissao().trim());
                 if (vencimento.isBefore(emissao)) {
-                    throw new ValidationException("A data de vencimento não pode ser anterior à data de emissão do orçamento (" + orcamento.getDataEmissao() + ").");
+                    throw new ValidationException("A data de vencimento não pode ser anterior à data de emissão do orçamento (" + Cobranca.formatarDataBR(orcamento.getDataEmissao()) + ").");
                 }
             } catch (DateTimeParseException ignored) {
             }
@@ -102,10 +106,12 @@ public class CobrancaService {
             throw new ValidationException("Cobrança sem cliente associado.");
         }
 
+        String primeiroNome = cliente.getPrimeiroNome();
         String servicoDesc = (orcamento != null && orcamento.getServico() != null)
                 ? orcamento.getServico().getDescricao()
                 : "Projeto de Arquitetura";
-        String valorFmt = String.format(Locale.GERMANY, "%.2f", cobranca.getValor());
+        String valorFmt = String.format(Locale.GERMANY, "%,.2f", cobranca.getValor());
+        String vencimentoFmt = Cobranca.formatarDataBR(cobranca.getDataVencimento());
 
         return String.format(
             "Olá, %s! Tudo bem?\n\n" +
@@ -114,7 +120,7 @@ public class CobrancaService {
             "• Valor Previsto: R$ %s\n" +
             "• Data de Vencimento: %s\n\n" +
             "Seguimos dedicados a cada detalhe do seu projeto. Caso já tenha realizado este acerto ou precise de qualquer esclarecimento, estou à inteira disposição!",
-            cliente.getNome(), servicoDesc, valorFmt, cobranca.getDataVencimento()
+            primeiroNome, servicoDesc, valorFmt, vencimentoFmt
         );
     }
 

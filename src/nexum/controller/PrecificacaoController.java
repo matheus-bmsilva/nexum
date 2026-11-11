@@ -5,6 +5,7 @@ import com.sun.net.httpserver.HttpHandler;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import nexum.ItemEtapa;
 import nexum.Padrao;
 import nexum.Servico;
@@ -12,10 +13,13 @@ import nexum.ServicoPorEtapa;
 import nexum.ServicoPorHora;
 import nexum.ServicoPorMetroQuadrado;
 import nexum.ServicoPorPercentualObra;
+import nexum.Usuario;
 import nexum.exception.EntityNotFoundException;
 import nexum.exception.ValidationException;
 import nexum.repository.sqlite.ServicoFactory;
 import nexum.service.PrecificacaoService;
+import nexum.service.UsuarioService;
+import nexum.web.AuthSessionManager;
 import nexum.web.HttpHelper;
 import nexum.web.JsonHelper;
 
@@ -25,13 +29,19 @@ import nexum.web.JsonHelper;
 public class PrecificacaoController implements HttpHandler {
 
     private final PrecificacaoService precificacaoService;
+    private final UsuarioService usuarioService;
 
     public PrecificacaoController() {
-        this(new PrecificacaoService());
+        this(new PrecificacaoService(), new UsuarioService());
     }
 
     public PrecificacaoController(PrecificacaoService precificacaoService) {
+        this(precificacaoService, new UsuarioService());
+    }
+
+    public PrecificacaoController(PrecificacaoService precificacaoService, UsuarioService usuarioService) {
         this.precificacaoService = precificacaoService;
+        this.usuarioService = usuarioService;
     }
 
     @Override
@@ -80,8 +90,11 @@ public class PrecificacaoController implements HttpHandler {
         Map<String, String> data = JsonHelper.parseSimpleJson(body);
 
         String tipo = data.getOrDefault("tipo", ServicoFactory.TIPO_METRO_QUADRADO);
-        double rbt12 = parseDouble(data.get("rbt12"), 0.0);
+        double rbt12 = obterRbt12Contexto(exchange, data);
         double imposto = parseDouble(data.get("imposto"), PrecificacaoService.IMPOSTO_PADRAO_MEI);
+        if (rbt12 > 0) {
+            imposto = precificacaoService.calcularAliquotaSimples(rbt12);
+        }
 
         Servico servicoTransient = switch (tipo) {
             case ServicoFactory.TIPO_METRO_QUADRADO -> {
@@ -125,7 +138,7 @@ public class PrecificacaoController implements HttpHandler {
         } catch (Exception e) {
             padrao = Padrao.MEDIO;
         }
-        double rbt12 = parseDouble(data.get("rbt12"), 0.0);
+        double rbt12 = obterRbt12Contexto(exchange, data);
         double imposto = parseDouble(data.get("imposto"), 0.0);
         if (rbt12 > 0) {
             imposto = precificacaoService.calcularAliquotaSimples(rbt12);
@@ -157,6 +170,27 @@ public class PrecificacaoController implements HttpHandler {
         };
 
         HttpHelper.sendJson(exchange, 201, JsonHelper.servicoToJson(salvo));
+    }
+
+    /**
+     * Obtém o RBT12 diretamente do perfil do usuário autenticado na sessão.
+     * Caso não haja sessão ativa (ex: chamadas diretas de teste), utiliza o valor informado no payload.
+     */
+    private double obterRbt12Contexto(HttpExchange exchange, Map<String, String> data) {
+        Optional<String> tokenOpt = AuthSessionManager.extrairToken(exchange);
+        if (tokenOpt.isPresent()) {
+            Optional<Integer> usuarioIdOpt = AuthSessionManager.validarSessao(tokenOpt.get());
+            if (usuarioIdOpt.isPresent()) {
+                try {
+                    Usuario usuario = usuarioService.buscarPorId(usuarioIdOpt.get());
+                    if (usuario != null) {
+                        return usuario.getRbt12();
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+        }
+        return parseDouble(data.get("rbt12"), 0.0);
     }
 
     private static double parseDouble(String str, double def) {

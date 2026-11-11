@@ -23,10 +23,9 @@ public class Orcamento {
         this.dataEmissao = dataEmissao;
         this.validade = validade;
         this.valorTotal = valorTotal;
-        this.statusOrcamento = StatusOrcamento.PENDENTE;
+        this.statusOrcamento = (statusOrcamento != null) ? statusOrcamento : StatusOrcamento.PENDENTE;
         this.servico = servico;
         this.cliente = cliente;
-        
     }
 
     public void setId(int id){
@@ -90,7 +89,32 @@ public class Orcamento {
     }
 
     public String enviarWhatsApp(){
-        String nomeCliente = this.cliente.getNome();
-        return "Olá, " + nomeCliente + "! Segue o orçamento prévio para os serviços solicitados. Qualquer dúvida, estamos à disposição!";
+        String primeiroNome = (this.cliente != null) ? this.cliente.getPrimeiroNome() : "Cliente";
+        String dataLimite = calcularDataValidadeFormatada();
+        String trechoValidade = !dataLimite.isBlank() ? " Proposta válida até " + dataLimite + "." : "";
+        return "Olá, " + primeiroNome + "! Segue o orçamento prévio para os serviços solicitados." + trechoValidade + " Qualquer dúvida, estamos à disposição!";
+    }
+
+    public String calcularDataValidadeFormatada() {
+        return calcularDataValidadeBR(this.dataEmissao, this.validade);
+    }
+
+    public static String calcularDataValidadeBR(String dataEmissao, int validadeDias) {
+        if (dataEmissao == null || dataEmissao.isBlank()) {
+            return "";
+        }
+        String limpa = dataEmissao.trim().split("T")[0];
+        try {
+            java.time.LocalDate emissao;
+            if (limpa.matches("\\d{2}/\\d{2}/\\d{4}")) {
+                emissao = java.time.LocalDate.parse(limpa, java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+            } else {
+                emissao = java.time.LocalDate.parse(limpa);
+            }
+            java.time.LocalDate dataFinal = emissao.plusDays(Math.max(0, validadeDias));
+            return dataFinal.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+        } catch (Exception e) {
+            return Cobranca.formatarDataBR(limpa);
+        }
     }
 }

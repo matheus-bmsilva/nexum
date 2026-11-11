@@ -44,7 +44,12 @@ public class OrcamentoController implements HttpHandler {
                 int id = Integer.parseInt(parts[parts.length - 2]);
                 String body = HttpHelper.readRequestBody(exchange);
                 Map<String, String> data = JsonHelper.parseSimpleJson(body);
-                String statusStr = data.getOrDefault("status", "APROVADO");
+                String statusStr = data.getOrDefault("status", "APROVADO").trim().toUpperCase();
+                if ("RECUSADA".equals(statusStr)) {
+                    statusStr = "RECUSADO";
+                } else if ("APROVADA".equals(statusStr)) {
+                    statusStr = "APROVADO";
+                }
                 StatusOrcamento status = StatusOrcamento.valueOf(statusStr);
 
                 orcamentoService.atualizarStatus(id, status);

@@ -60,15 +60,21 @@ public class DatabaseIntegrationTest {
         assert "Carlos E. Arquiteto".equals(clienteAtualizado.getNome()) : "Nome não foi atualizado";
         System.out.println("[OK] ClienteRepository: Salvar, BuscarPorCpf, BuscarPorId e Atualizar validados.");
 
-        // 3. Teste de UsuarioRepository
-        Usuario usuario = new Usuario("Matheus Silva", "hashSenhaForte123", "(11) 91234-5678", "12.345.678/0001-90");
+        // 3. Teste de UsuarioRepository (incluindo persistência e atualização de RBT12)
+        Usuario usuario = new Usuario("Matheus Silva", "matheus@nexus.arq", "hashSenhaForte123", "(11) 91234-5678", "12.345.678/0001-90", 240000.0);
         usuarioRepo.salvar(usuario);
         assert usuario.getId() > 0 : "ID de usuario deve ser gerado";
 
         Optional<Usuario> usuarioBuscado = usuarioRepo.buscarPorCnpj("12.345.678/0001-90");
         assert usuarioBuscado.isPresent() : "Usuário deve ser encontrado por CNPJ";
         assert "Matheus Silva".equals(usuarioBuscado.get().getNome()) : "Nome do usuário incorreto";
-        System.out.println("[OK] UsuarioRepository: Salvar e BuscarPorCnpj validados.");
+        assert Math.abs(usuarioBuscado.get().getRbt12() - 240000.0) < 0.01 : "RBT12 do usuário não foi persistido corretamente";
+
+        usuario.setRbt12(350000.0);
+        usuarioRepo.atualizar(usuario);
+        Usuario usuarioAtualizado = usuarioRepo.buscarPorId(usuario.getId()).orElseThrow();
+        assert Math.abs(usuarioAtualizado.getRbt12() - 350000.0) < 0.01 : "RBT12 do usuário não foi atualizado corretamente";
+        System.out.println("[OK] UsuarioRepository: Salvar, BuscarPorCnpj e Atualizar (com RBT12) validados.");
 
         // 4. Teste de Persistência Polimórfica de Serviços (4 modalidades)
         // 4.1. ServicoPorMetroQuadrado: 150m² * R$ 40/m² = R$ 6000.0
@@ -139,8 +145,12 @@ public class DatabaseIntegrationTest {
         assert orcAprovado.getStatusOrcamento() == StatusOrcamento.APROVADO : "Status não foi atualizado para APROVADO";
 
         String mensagemWhats = orcAprovado.enviarWhatsApp();
-        assert mensagemWhats.contains("Carlos E. Arquiteto") : "Mensagem de WhatsApp deve citar o nome do cliente";
-        System.out.println("[OK] OrcamentoRepository: Salvar, associar serviço/cliente, atualizar status e mensagem validados.");
+        assert mensagemWhats.contains("Olá, Carlos!") : "Mensagem de WhatsApp deve saudar apenas pelo primeiro nome do cliente";
+        assert !mensagemWhats.contains("Carlos E. Arquiteto") : "Mensagem de WhatsApp não deve exibir o nome completo na saudação";
+        assert mensagemWhats.contains("Proposta válida até 20/11/2026") : "Mensagem de WhatsApp deve exibir data limite fixa (05/11/2026 + 15 dias = 20/11/2026)";
+        assert "Cliente".equals(Cliente.extrairPrimeiroNome(null)) : "Fallback de primeiro nome nulo deve ser 'Cliente'";
+        assert "Cliente".equals(Cliente.extrairPrimeiroNome("   ")) : "Fallback de primeiro nome em branco deve ser 'Cliente'";
+        System.out.println("[OK] OrcamentoRepository: Salvar, associar serviço/cliente, atualizar status, saudação pelo primeiro nome e data limite fixa validados.");
 
         // 6. Teste de CobrancaRepository
         Cobranca cobranca = new Cobranca(
@@ -153,7 +163,8 @@ public class DatabaseIntegrationTest {
         assert cobrancaRecuperada.getStatusCobranca() == StatusCobranca.EM_ABERTO : "Status da cobrança deve ser EM_ABERTO";
 
         String mensagemCobranca = cobrancaRecuperada.gerarMensagemCobranca();
-        assert mensagemCobranca.contains("R$ 6000.0") : "Mensagem deve conter o valor da cobrança";
+        assert mensagemCobranca.contains("R$ 6.000,00") : "Mensagem deve conter o valor da cobrança formatado em BRL (R$ 6.000,00)";
+        assert mensagemCobranca.contains("05/12/2026") : "Mensagem deve conter a data de vencimento formatada em dd/MM/yyyy";
 
         cobrancaRepo.registrarPagamento(cobranca.getId(), "2026-11-20");
         Cobranca cobrancaPaga = cobrancaRepo.buscarPorId(cobranca.getId()).orElseThrow();

@@ -73,8 +73,9 @@ public class AuthController implements HttpHandler {
         }
         String cnpj = data.get("cnpj");
         String senha = data.get("senha");
+        double rbt12 = parseMoeda(data.get("rbt12"), 0.0);
 
-        Usuario novoUsuario = usuarioService.cadastrar(nome, email, whatsApp, cnpj, senha);
+        Usuario novoUsuario = usuarioService.cadastrar(nome, email, whatsApp, cnpj, senha, rbt12);
         String token = AuthSessionManager.criarSessao(novoUsuario.getId());
 
         String jsonResp = "{\"token\": \"" + token + "\", \"usuario\": " + JsonHelper.usuarioToJson(novoUsuario) + "}";
@@ -119,9 +120,30 @@ public class AuthController implements HttpHandler {
             whatsApp = data.get("whatsapp");
         }
         String novaSenha = data.get("novaSenha");
+        Double rbt12 = null;
+        if (data.containsKey("rbt12")) {
+            rbt12 = parseMoeda(data.get("rbt12"), 0.0);
+        }
 
-        Usuario atualizado = usuarioService.atualizarPerfil(usuarioId, nome, email, whatsApp, novaSenha);
+        Usuario atualizado = usuarioService.atualizarPerfil(usuarioId, nome, email, whatsApp, rbt12, novaSenha);
         HttpHelper.sendJson(exchange, 200, JsonHelper.usuarioToJson(atualizado));
+    }
+
+    private static double parseMoeda(String str, double def) {
+        if (str == null || str.isBlank()) {
+            return def;
+        }
+        try {
+            String sanitized = str.trim().replaceAll("R\\$\\s?", "").trim();
+            if (sanitized.contains(".") && sanitized.contains(",")) {
+                sanitized = sanitized.replace(".", "").replace(",", ".");
+            } else if (sanitized.contains(",")) {
+                sanitized = sanitized.replace(",", ".");
+            }
+            return Double.parseDouble(sanitized);
+        } catch (NumberFormatException e) {
+            return def;
+        }
     }
 
     private void handleLogout(HttpExchange exchange) throws IOException {

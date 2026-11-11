@@ -111,11 +111,12 @@ public class WebIntegrationTest {
             System.out.println("[OK] UsuarioService: Bloqueio de senha sem maiúscula/especial validado com sucesso.");
         }
 
-        // 4.3. Cadastro de arquiteto com CNPJ válido e senha forte (>= 12 chars, maiúscula e especial)
+        // 4.3. Cadastro de arquiteto com CNPJ válido, senha forte (>= 12 chars, maiúscula e especial) e RBT12
         Usuario arquiteto = usuarioService.cadastrar(
-            "Studio Nexus Arquitetura", "contato@nexus.arq", "(11) 91234-5678", "11.222.333/0001-81", "Segredo@Forte2026"
+            "Studio Nexus Arquitetura", "contato@nexus.arq", "(11) 91234-5678", "11.222.333/0001-81", "Segredo@Forte2026", 300000.0
         );
         assert arquiteto.getId() > 0 : "ID de usuário deve ser gerado";
+        assert Math.abs(arquiteto.getRbt12() - 300000.0) < 0.01 : "RBT12 inicial do arquiteto deve ser 300.000,00";
 
         // 4.4. Bloqueio de CNPJ duplicado
         try {
@@ -222,8 +223,13 @@ public class WebIntegrationTest {
 
         String urlWhats = orcamentoService.gerarLinkWhatsApp(orcamento.getId());
         assert urlWhats.startsWith("https://wa.me/5511977778888?text=") : "Link universal do WhatsApp inválido";
-        assert urlWhats.contains("Beatriz") : "Link deve conter nome do cliente";
-        System.out.println("[OK] OrcamentoService: Emissão de proposta e link wa.me validados.");
+        String decodedWhats = java.net.URLDecoder.decode(urlWhats, java.nio.charset.StandardCharsets.UTF_8);
+        assert decodedWhats.contains("Olá, Beatriz!") : "Mensagem de proposta WhatsApp deve saudar apenas pelo primeiro nome";
+        assert !decodedWhats.contains("Beatriz Engenheira") : "Mensagem de proposta WhatsApp não deve conter o sobrenome na saudação";
+        assert decodedWhats.contains("R$ 5.300,00") : "Mensagem de proposta WhatsApp deve conter o valor em BRL (R$ 5.300,00)";
+        assert decodedWhats.contains("Proposta válida até 25/11/2026") : "Mensagem de proposta WhatsApp deve conter a data limite exata (05/11/2026 + 20 dias = 25/11/2026)";
+        assert !decodedWhats.contains("20 dias") : "Mensagem de proposta WhatsApp não deve mais exibir prazo relativo em dias";
+        System.out.println("[OK] OrcamentoService: Emissão de proposta e link wa.me (primeiro nome + BRL + validade fixa dd/MM/yyyy) validados.");
 
         // 7. Testes de CobrancaService, Validação de Data e Mensagem Amigável
         CobrancaService cobrancaService = new CobrancaService();
@@ -241,17 +247,31 @@ public class WebIntegrationTest {
         Cobranca cobranca = cobrancaService.gerarCobrancaParaOrcamento(orcamento.getId(), vencimentoValido);
         assert cobranca.getId() > 0 : "Cobrança deveria ter ID";
 
-        // 7.3. Validação de mensagem amigável sem termo 'cobrança'
+        // 7.3. Validação de mensagem amigável sem termo 'cobrança' e com primeiro nome + BRL + dd/MM/yyyy
         String msgInvestimento = cobrancaService.gerarMensagemCobranca(cobranca.getId());
         assert !msgInvestimento.toLowerCase().contains("cobrança") : "Mensagem não pode conter a palavra 'cobrança'";
+        assert msgInvestimento.contains("Olá, Beatriz!") : "Mensagem de cobrança deve saudar apenas pelo primeiro nome";
+        assert !msgInvestimento.contains("Beatriz Engenheira") : "Mensagem de cobrança não deve conter o sobrenome na saudação";
         assert msgInvestimento.contains("investimento") : "Mensagem deve mencionar investimento no projeto";
-        System.out.println("[OK] CobrancaService: Mensagem não-negativa e cordial validada.");
+        assert msgInvestimento.contains("R$ 5.300,00") : "Mensagem de cobrança deve exibir o valor em formato BRL (R$ 5.300,00)";
+        assert msgInvestimento.contains(Cobranca.formatarDataBR(vencimentoValido)) : "Mensagem de cobrança deve exibir vencimento em dd/MM/yyyy";
+        System.out.println("[OK] CobrancaService: Mensagem não-negativa, cordial e formatada (primeiro nome + BRL + dd/MM/yyyy) validada.");
 
         // 7.4. Liquidação e Extrato
         cobrancaService.registrarPagamento(cobranca.getId(), java.time.LocalDate.now().toString());
         Cobranca cobrancaLiquidada = cobrancaService.buscarPorId(cobranca.getId());
         assert cobrancaLiquidada.getStatusCobranca() == StatusCobranca.PAGO : "Deveria estar paga";
         System.out.println("[OK] CobrancaService: Liquidação validada.");
+
+        // 7.5. Bloqueio de geração de cobrança para proposta recusada (Regra de Negócio Etapa 5)
+        Orcamento orcRecusado = orcamentoService.emitirOrcamento(cliente.getId(), sEtapa.getId(), 15, "2026-11-06");
+        orcamentoService.atualizarStatus(orcRecusado.getId(), StatusOrcamento.RECUSADO);
+        try {
+            cobrancaService.gerarCobrancaParaOrcamento(orcRecusado.getId(), vencimentoValido);
+            assert false : "Deveria ter lançado ValidationException ao tentar gerar cobrança para proposta recusada";
+        } catch (ValidationException e) {
+            System.out.println("[OK] CobrancaService: Trava defensiva contra cobrança em proposta recusada validada.");
+        }
 
         // 8. Testes do Servidor Web HTTP Nativo (NexumServer)
         try {
@@ -266,8 +286,11 @@ public class WebIntegrationTest {
             assert indexResp.statusCode() == 200 : "Index HTML status deveria ser 200";
             assert indexResp.body().contains("Nexum") : "Página deve conter Nexum";
             assert indexResp.body().contains("Não há clientes cadastrados.") : "HTML deve conter mensagem para lista vazia";
+            assert indexResp.body().contains("id=\"busca-clientes\"") : "HTML deve conter barra de busca de clientes";
+            assert indexResp.body().contains("id=\"busca-orcamentos\"") : "HTML deve conter barra de busca de propostas";
+            assert indexResp.body().contains("id=\"busca-cobrancas\"") : "HTML deve conter barra de busca de cobranças";
             assert !indexResp.body().contains("Simular Cálculo") : "Botão inútil de simulação deve ter sido removido";
-            System.out.println("[OK] NexumServer: Entrega de HTML com mensagem amigável de lista vazia validada.");
+            System.out.println("[OK] NexumServer: Entrega de HTML com barras de busca dinâmicas e mensagem amigável validada.");
 
             // 8.2. POST /api/auth/login via HTTP API
             String payloadLogin = "{\"identificador\": \"contato@nexus.arq\", \"senha\": \"Segredo@Forte2026\"}";
@@ -297,23 +320,25 @@ public class WebIntegrationTest {
             );
             assert perfilResp.statusCode() == 200 : "Perfil HTTP deve retornar 200 com token";
             assert perfilResp.body().contains("Studio Nexus Arquitetura") : "Perfil deve conter o nome do arquiteto";
-            System.out.println("[OK] NexumServer: Endpoint GET /api/auth/perfil autenticado validado.");
+            assert perfilResp.body().contains("300000.00") : "Perfil deve retornar o RBT12 cadastrado";
+            System.out.println("[OK] NexumServer: Endpoint GET /api/auth/perfil autenticado (com RBT12) validado.");
 
-            // 8.4. POST /api/servicos/calcular (Cálculo em tempo real com Simples Nacional)
-            String payloadCalculo = "{\"tipo\": \"METRO_QUADRADO\", \"area\": 80, \"valorMetroQuadrado\": 60, \"rbt12\": 300000.0}";
+            // 8.4. POST /api/servicos/calcular buscando RBT12 diretamente do perfil do usuário logado
+            String payloadCalculo = "{\"tipo\": \"METRO_QUADRADO\", \"area\": 80, \"valorMetroQuadrado\": 60}";
             HttpResponse<String> calculoResp = client.send(
                 HttpRequest.newBuilder()
                     .uri(URI.create("http://localhost:" + TEST_PORT + "/api/servicos/calcular"))
                     .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer " + token)
                     .POST(HttpRequest.BodyPublishers.ofString(payloadCalculo))
                     .build(),
                 HttpResponse.BodyHandlers.ofString()
             );
             assert calculoResp.statusCode() == 200 : "API calcular status deveria ser 200";
-            assert calculoResp.body().contains("\"faixaSimples\": 2") : "Deveria retornar faixa 2 do Simples";
+            assert calculoResp.body().contains("\"faixaSimples\": 2") : "Deveria retornar faixa 2 do Simples com base no perfil logado";
             assert calculoResp.body().contains("0.0808") : "Alíquota efetiva calculada deve ser 8.08%";
             assert calculoResp.body().contains("5187.84") : "Valor final com imposto efetivo deveria ser 5187.84";
-            System.out.println("[OK] NexumServer: Endpoint POST /api/servicos/calcular com Simples Nacional validado.");
+            System.out.println("[OK] NexumServer: Endpoint POST /api/servicos/calcular com RBT12 do perfil logado validado.");
 
             // 8.5. DELETE /api/cobrancas/{id}
             Cobranca cobrancaParaExcluir = cobrancaService.gerarCobrancaParaOrcamento(orcamento.getId(), java.time.LocalDate.now().plusDays(15).toString());
@@ -332,6 +357,19 @@ public class WebIntegrationTest {
             }
             assert foiRemovido : "Cobrança deveria ter sido removida do banco de dados";
             System.out.println("[OK] NexumServer: Endpoint DELETE /api/cobrancas/{id} validado com sucesso.");
+
+            // 8.6. POST /api/cobrancas para orçamento recusado deve retornar HTTP 400
+            String payloadCobrancaRecusada = "{\"orcamentoId\": " + orcRecusado.getId() + ", \"dataVencimento\": \"" + vencimentoValido + "\"}";
+            HttpResponse<String> cobRecusadaResp = client.send(
+                HttpRequest.newBuilder()
+                    .uri(URI.create("http://localhost:" + TEST_PORT + "/api/cobrancas"))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(payloadCobrancaRecusada))
+                    .build(),
+                HttpResponse.BodyHandlers.ofString()
+            );
+            assert cobRecusadaResp.statusCode() == 400 : "POST /api/cobrancas para proposta recusada deveria retornar HTTP 400";
+            System.out.println("[OK] NexumServer: Bloqueio HTTP 400 ao tentar cobrar proposta recusada validado.");
 
         } finally {
             NexumServer.stop();

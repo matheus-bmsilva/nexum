@@ -27,11 +27,18 @@ public class UsuarioService {
     }
 
     /**
-     * Cadastra um novo arquiteto/escritório com validação matemática estrita de CNPJ
-     * e hashing criptográfico seguro de senha.
+     * Cadastra um novo arquiteto/escritório com validação matemática estrita de CNPJ,
+     * validação de limites do Simples Nacional (RBT12) e hashing criptográfico seguro de senha.
      */
-    public Usuario cadastrar(String nome, String email, String whatsApp, String cnpj, String senha) {
+    public Usuario cadastrar(String nome, String email, String whatsApp, String cnpj, String senha, double rbt12) {
         validarCampos(nome, email, whatsApp, cnpj, senha, true);
+
+        if (rbt12 < 0) {
+            throw new ValidationException("O faturamento acumulado RBT12 não pode ser negativo.");
+        }
+        if (rbt12 > SimplesNacionalService.LIMITE_MAXIMO_RBT12) {
+            throw new ValidationException("O faturamento RBT12 informado ultrapassa o teto máximo de R$ 4.800.000,00 do Simples Nacional.");
+        }
 
         String cnpjFormatado = DocumentoValidator.formatarCnpj(cnpj);
         String cnpjLimpo = DocumentoValidator.sanitizar(cnpj);
@@ -48,8 +55,12 @@ public class UsuarioService {
         String senhaHash = PasswordSecurity.hashPassword(senha);
         String telSanitizado = ClienteService.sanitizarTelefone(whatsApp);
 
-        Usuario usuario = new Usuario(0, nome.trim(), emailLimpo, senhaHash, telSanitizado, cnpjFormatado);
+        Usuario usuario = new Usuario(0, nome.trim(), emailLimpo, senhaHash, telSanitizado, cnpjFormatado, rbt12);
         return usuarioRepository.salvar(usuario);
+    }
+
+    public Usuario cadastrar(String nome, String email, String whatsApp, String cnpj, String senha) {
+        return cadastrar(nome, email, whatsApp, cnpj, senha, 0.0);
     }
 
     /**
@@ -115,7 +126,7 @@ public class UsuarioService {
     /**
      * Atualiza dados de perfil do usuário autenticado.
      */
-    public Usuario atualizarPerfil(int id, String nome, String email, String whatsApp, String novaSenhaOpcional) {
+    public Usuario atualizarPerfil(int id, String nome, String email, String whatsApp, Double rbt12Opcional, String novaSenhaOpcional) {
         Usuario usuario = buscarPorId(id);
 
         if (nome == null || nome.trim().length() < 2) {
@@ -137,6 +148,16 @@ public class UsuarioService {
         usuario.setEmail(emailLimpo);
         usuario.setWhatsApp(ClienteService.sanitizarTelefone(whatsApp));
 
+        if (rbt12Opcional != null) {
+            if (rbt12Opcional < 0) {
+                throw new ValidationException("O faturamento acumulado RBT12 não pode ser negativo.");
+            }
+            if (rbt12Opcional > SimplesNacionalService.LIMITE_MAXIMO_RBT12) {
+                throw new ValidationException("O faturamento RBT12 informado ultrapassa o teto máximo de R$ 4.800.000,00 do Simples Nacional.");
+            }
+            usuario.setRbt12(rbt12Opcional);
+        }
+
         if (novaSenhaOpcional != null && !novaSenhaOpcional.isBlank()) {
             validarComplexidadeSenha(novaSenhaOpcional);
             usuario.setSenha(PasswordSecurity.hashPassword(novaSenhaOpcional));
@@ -144,6 +165,10 @@ public class UsuarioService {
 
         usuarioRepository.atualizar(usuario);
         return usuario;
+    }
+
+    public Usuario atualizarPerfil(int id, String nome, String email, String whatsApp, String novaSenhaOpcional) {
+        return atualizarPerfil(id, nome, email, whatsApp, null, novaSenhaOpcional);
     }
 
     public void deletar(int id) {

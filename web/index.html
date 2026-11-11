@@ -90,6 +90,11 @@
           <input type="text" id="reg-whatsapp" placeholder="(11) 98765-4321" required>
         </div>
         <div class="form-group">
+          <label for="reg-rbt12">Receita Bruta Acumulada 12 Meses (RBT12) *</label>
+          <input type="text" id="reg-rbt12" class="input-moeda" placeholder="R$ 180.000,00" inputmode="decimal" required>
+          <small class="form-help">Informe o faturamento bruto acumulado dos últimos 12 meses para cálculo do Simples Nacional.</small>
+        </div>
+        <div class="form-group">
           <label for="reg-senha">Senha de Acesso (mínimo 12 caracteres, maiúscula e especial) *</label>
           <div class="password-wrapper">
             <input type="password" id="reg-senha" placeholder="Crie uma senha forte" minlength="12" required>
@@ -157,12 +162,6 @@
                     <option value="ALTO">Padrão Alto</option>
                   </select>
                 </div>
-              </div>
-
-              <div class="form-group">
-                <label for="servico-rbt12">Receita Bruta Acumulada 12 Meses (RBT12) *</label>
-                <input type="text" id="servico-rbt12" class="input-moeda" placeholder="R$ 180.000,00" value="R$ 180.000,00" inputmode="decimal">
-                <small class="form-help">Calcula a alíquota efetiva do Simples Nacional (Anexo III - Arquitetura e Urbanismo).</small>
               </div>
 
               <!-- Seletor de Modalidade Polimórfica Sóbrio -->
@@ -312,6 +311,15 @@
             </div>
             <button class="btn btn-primary" id="btn-abrir-modal-cliente">Cadastrar Cliente</button>
           </div>
+          <div class="search-toolbar">
+            <div class="search-input-wrapper">
+              <svg class="search-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input type="search" id="busca-clientes" class="search-input" placeholder="Buscar cliente por nome, CPF ou WhatsApp...">
+            </div>
+          </div>
           <div class="table-container">
             <table class="table" id="tabela-clientes">
               <thead>
@@ -339,6 +347,15 @@
               <p>Histórico de orçamentos, status de aprovação e links de envio direto.</p>
             </div>
             <button class="btn btn-primary" id="btn-abrir-modal-orcamento">Nova Proposta</button>
+          </div>
+          <div class="search-toolbar">
+            <div class="search-input-wrapper">
+              <svg class="search-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input type="search" id="busca-orcamentos" class="search-input" placeholder="Buscar proposta por cliente, serviço, valor, data ou status...">
+            </div>
           </div>
           <div class="table-container">
             <table class="table" id="tabela-orcamentos">
@@ -391,6 +408,15 @@
               <p>Acompanhe liquidações e envie notificações cordiais de investimento.</p>
             </div>
             <button class="btn btn-primary" id="btn-abrir-modal-cobranca">Registrar Cobrança</button>
+          </div>
+          <div class="search-toolbar">
+            <div class="search-input-wrapper">
+              <svg class="search-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input type="search" id="busca-cobrancas" class="search-input" placeholder="Buscar cobrança por cliente, status, data de vencimento/pagamento ou valor...">
+            </div>
           </div>
           <div class="table-container">
             <table class="table" id="tabela-cobrancas">
@@ -545,6 +571,11 @@
         <div class="form-group">
           <label for="perfil-whatsapp">WhatsApp</label>
           <input type="text" id="perfil-whatsapp" required>
+        </div>
+        <div class="form-group">
+          <label for="perfil-rbt12">Receita Bruta Acumulada 12 Meses (RBT12) *</label>
+          <input type="text" id="perfil-rbt12" class="input-moeda" placeholder="R$ 180.000,00" inputmode="decimal" required>
+          <small class="form-help">Atualizar o faturamento bruto acumulado dos últimos 12 meses recalcula automaticamente a alíquota do Simples Nacional.</small>
         </div>
         <div class="form-group">
           <label for="perfil-nova-senha">Nova Senha (deixe em branco para manter a atual)</label>

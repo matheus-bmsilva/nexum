@@ -58,4 +58,15 @@ public class Cliente {
     public String getWhatsApp(){
         return whatsApp;
     }
+
+    public String getPrimeiroNome() {
+        return extrairPrimeiroNome(this.nome);
+    }
+
+    public static String extrairPrimeiroNome(String nomeCompleto) {
+        if (nomeCompleto == null || nomeCompleto.trim().isEmpty()) {
+            return "Cliente";
+        }
+        return nomeCompleto.trim().split("\\s+")[0];
+    }
 }

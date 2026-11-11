@@ -16,26 +16,36 @@ public class Usuario {
     private String senha;
     private String whatsApp;
     private String cnpj;
+    private double rbt12;
 
-    public Usuario(int id, String nome, String email, String senha, String whatsApp, String cnpj) {
+    public Usuario(int id, String nome, String email, String senha, String whatsApp, String cnpj, double rbt12) {
         this.id = id;
         this.nome = nome;
         this.email = email;
         this.senha = senha;
         this.whatsApp = whatsApp;
         this.cnpj = cnpj;
+        this.rbt12 = rbt12;
+    }
+
+    public Usuario(int id, String nome, String email, String senha, String whatsApp, String cnpj) {
+        this(id, nome, email, senha, whatsApp, cnpj, 0.0);
+    }
+
+    public Usuario(String nome, String email, String senha, String whatsApp, String cnpj, double rbt12) {
+        this(0, nome, email, senha, whatsApp, cnpj, rbt12);
     }
 
     public Usuario(String nome, String email, String senha, String whatsApp, String cnpj) {
-        this(0, nome, email, senha, whatsApp, cnpj);
+        this(0, nome, email, senha, whatsApp, cnpj, 0.0);
     }
 
     public Usuario(int id, String nome, String senha, String whatsApp, String cnpj) {
-        this(id, nome, "", senha, whatsApp, cnpj);
+        this(id, nome, "", senha, whatsApp, cnpj, 0.0);
     }
 
     public Usuario(String nome, String senha, String whatsApp, String cnpj) {
-        this(0, nome, "", senha, whatsApp, cnpj);
+        this(0, nome, "", senha, whatsApp, cnpj, 0.0);
     }
 
     public void setId(int id){
@@ -84,6 +94,14 @@ public class Usuario {
 
     public String getCnpj(){
         return cnpj;
+    }
+
+    public double getRbt12() {
+        return rbt12;
+    }
+
+    public void setRbt12(double rbt12) {
+        this.rbt12 = rbt12;
     }
 
     public void fazerLogin(){

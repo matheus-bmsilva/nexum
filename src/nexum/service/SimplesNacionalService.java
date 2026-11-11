@@ -52,7 +52,7 @@ public class SimplesNacionalService {
             throw new ValidationException("O faturamento acumulado RBT12 não pode ser negativo.");
         }
         if (rbt12 > LIMITE_MAXIMO_RBT12) {
-            throw new ValidationException("O faturamento RBT12 informado (R$ " + rbt12 +
+            throw new ValidationException("O faturamento RBT12 informado (R$ " + String.format(java.util.Locale.GERMANY, "%,.2f", rbt12) +
                 ") excede o limite máximo permitido de R$ 4.800.000,00 para o Simples Nacional.");
         }
 

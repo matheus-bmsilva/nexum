@@ -85,9 +85,23 @@ public class Cobranca {
     }
 
     public String gerarMensagemCobranca(){
-        String nomeCliente = (this.orcamento != null && this.orcamento.getCliente() != null)
-                ? this.orcamento.getCliente().getNome()
+        String primeiroNome = (this.orcamento != null && this.orcamento.getCliente() != null)
+                ? this.orcamento.getCliente().getPrimeiroNome()
                 : "Cliente";
-        return "Olá, " + nomeCliente + "! Tudo bem? Segue o lembrete referente ao investimento previsto para a etapa do seu projeto de arquitetura, no valor de R$ " + this.valor + " com vencimento em " + this.dataVencimento + ". Qualquer dúvida, estamos à disposição!";
+        String valorFmt = String.format(java.util.Locale.GERMANY, "%,.2f", this.valor);
+        String vencimentoFmt = formatarDataBR(this.dataVencimento);
+        return "Olá, " + primeiroNome + "! Tudo bem? Segue o lembrete referente ao investimento previsto para a etapa do seu projeto de arquitetura, no valor de R$ " + valorFmt + " com vencimento em " + vencimentoFmt + ". Qualquer dúvida, estamos à disposição!";
+    }
+
+    public static String formatarDataBR(String dataIso) {
+        if (dataIso == null || dataIso.isBlank()) {
+            return "";
+        }
+        String limpa = dataIso.trim();
+        String[] partes = limpa.split("T")[0].split("-");
+        if (partes.length == 3 && partes[0].length() == 4) {
+            return partes[2] + "/" + partes[1] + "/" + partes[0];
+        }
+        return limpa;
     }
 }

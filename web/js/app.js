@@ -4,6 +4,12 @@
 
 const TOKEN_KEY = 'nexum_auth_token';
 
+/**
+ * RBT12 do perfil do usuário logado, carregado automaticamente após autenticação.
+ * Utilizado nos cálculos de Simples Nacional sem necessidade de input manual na tela de precificação.
+ */
+let usuarioRbt12 = 0;
+
 function getToken() {
   return localStorage.getItem(TOKEN_KEY);
 }
@@ -54,9 +60,10 @@ document.addEventListener('DOMContentLoaded', () => {
   initClientes();
   initOrcamentos();
   initFinanceiro();
+  initBuscaDinamica();
 
-  // Preenche datas de hoje por padrão
-  const hoje = new Date().toISOString().split('T')[0];
+  // Preenche datas de hoje por padrão (fuso horário local, mantendo yyyy-MM-dd para <input type="date">)
+  const hoje = obterDataLocalISO();
   const elDataServico = document.getElementById('servico-data');
   if (elDataServico) elDataServico.value = hoje;
   const elDataEmissao = document.getElementById('orcamento-data-emissao');
@@ -66,7 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const dataVenc = new Date();
   dataVenc.setDate(dataVenc.getDate() + 15);
   const elDataVenc = document.getElementById('cobranca-vencimento');
-  if (elDataVenc) elDataVenc.value = dataVenc.toISOString().split('T')[0];
+  if (elDataVenc) elDataVenc.value = obterDataLocalISO(dataVenc);
 
   // Verifica estado de autenticação inicial
   verificarAutenticacao();
@@ -145,6 +152,7 @@ function initAuth() {
         cnpj: document.getElementById('reg-cnpj').value,
         email: document.getElementById('reg-email').value,
         whatsApp: document.getElementById('reg-whatsapp').value,
+        rbt12: parseNumeroBRL(document.getElementById('reg-rbt12').value),
         senha: document.getElementById('reg-senha').value
       };
 
@@ -195,6 +203,10 @@ function initAuth() {
         document.getElementById('perfil-cnpj').value = u.cnpj || '';
         document.getElementById('perfil-email').value = u.email || '';
         document.getElementById('perfil-whatsapp').value = u.whatsApp || '';
+        const perfilRbt12 = document.getElementById('perfil-rbt12');
+        if (perfilRbt12) {
+          perfilRbt12.value = (u.rbt12 !== undefined && u.rbt12 !== null) ? formatarMoeda(u.rbt12) : '';
+        }
         document.getElementById('perfil-nova-senha').value = '';
 
         modalPerfil.classList.remove('hidden');
@@ -214,6 +226,7 @@ function initAuth() {
           nome: document.getElementById('perfil-nome').value,
           email: document.getElementById('perfil-email').value,
           whatsApp: document.getElementById('perfil-whatsapp').value,
+          rbt12: parseNumeroBRL(document.getElementById('perfil-rbt12').value),
           novaSenha: document.getElementById('perfil-nova-senha').value
         };
 
@@ -231,6 +244,8 @@ function initAuth() {
           }
 
           document.getElementById('user-display-name').textContent = data.nome;
+          usuarioRbt12 = (data && data.rbt12 !== undefined) ? data.rbt12 : 0;
+          simularCalculo();
           showToast('Perfil atualizado com sucesso!');
           fecharPerfil();
         } catch (err) {
@@ -320,6 +335,10 @@ function mostrarPainelApp(usuario) {
   if (usuario && usuario.nome) {
     document.getElementById('user-display-name').textContent = usuario.nome;
   }
+
+  // Carrega o RBT12 do perfil do usuário para cálculos tributários
+  usuarioRbt12 = (usuario && usuario.rbt12) ? usuario.rbt12 : 0;
+  simularCalculo();
 
   // Carrega os dados operacionais das abas
   carregarClientes();
@@ -465,7 +484,7 @@ function initEtapasManager() {
    ========================================================================== */
 function initCalculoSimulacao() {
   const inputsParaMonitorar = [
-    'servico-rbt12', 'm2-area', 'm2-valor', 'hora-horas', 'hora-valor', 'perc-custo', 'perc-taxa'
+    'm2-area', 'm2-valor', 'hora-horas', 'hora-valor', 'perc-custo', 'perc-taxa'
   ];
   inputsParaMonitorar.forEach(id => {
     const el = document.getElementById(id);
@@ -476,9 +495,7 @@ function initCalculoSimulacao() {
 function coletarDadosModalidade() {
   const radioChecked = document.querySelector('input[name="modalidade"]:checked');
   const modalidade = radioChecked ? radioChecked.value : 'METRO_QUADRADO';
-  const rbt12Input = document.getElementById('servico-rbt12');
-  const rbt12 = rbt12Input ? parseNumeroBRL(rbt12Input.value) : 0;
-  const payload = { tipo: modalidade, rbt12: rbt12, imposto: 0.06 };
+  const payload = { tipo: modalidade, rbt12: usuarioRbt12, imposto: 0.06 };
 
   if (modalidade === 'METRO_QUADRADO') {
     payload.area = parseNumeroBRL(document.getElementById('m2-area').value);
@@ -651,30 +668,56 @@ function initClientes() {
   });
 }
 
+let cacheClientes = [];
+
 async function carregarClientes() {
   try {
     const resp = await authFetch('/api/clientes');
     if (!resp.ok) {
-      renderTabelaClientes([]);
+      cacheClientes = [];
+      filtrarClientes();
       return;
     }
 
     const data = await resp.json();
     const clientes = Array.isArray(data) ? data : (data && Array.isArray(data.clientes) ? data.clientes : []);
-    renderTabelaClientes(clientes);
+    cacheClientes = clientes;
+    filtrarClientes();
     atualizarDropdownsClientes(clientes);
   } catch (err) {
     console.error('Erro ao listar clientes:', err);
-    renderTabelaClientes([]);
+    cacheClientes = [];
+    filtrarClientes();
   }
 }
 
-function renderTabelaClientes(clientes) {
+function filtrarClientes() {
+  const inputBusca = document.getElementById('busca-clientes');
+  const termo = normalizarTextoBusca(inputBusca ? inputBusca.value : '');
+  if (!termo) {
+    renderTabelaClientes(cacheClientes, false);
+    return;
+  }
+
+  const filtrados = cacheClientes.filter(c => {
+    const cpfDigitos = String(c.cpf || '').replace(/\D/g, '');
+    const whatsDigitos = String(c.whatsApp || '').replace(/\D/g, '');
+    const alvo = normalizarTextoBusca(`${c.nome || ''} ${c.cpf || ''} ${cpfDigitos} ${c.whatsApp || ''} ${whatsDigitos}`);
+    return alvo.includes(termo);
+  });
+
+  renderTabelaClientes(filtrados, true);
+}
+
+function renderTabelaClientes(clientes, filtroAtivo = false) {
   const tbody = document.getElementById('tabela-clientes-corpo');
   if (!tbody) return;
 
   if (!clientes || clientes.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Não há clientes cadastrados.</td></tr>';
+    const msg = filtroAtivo
+      ? 'Nenhum cliente encontrado para a busca informada.'
+      : 'Não há clientes cadastrados.';
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted">${msg}</td></tr>`;
     return;
   }
 
@@ -683,7 +726,7 @@ function renderTabelaClientes(clientes) {
       <td><strong>${escapeHtml(c.nome)}</strong></td>
       <td>${escapeHtml(c.cpf)}</td>
       <td>
-        <a href="https://wa.me/${c.whatsApp}" target="_blank" class="btn btn-whatsapp btn-sm">
+        <a href="${gerarLinkWhatsAppContatoRapido(c.whatsApp, c.nome)}" target="_blank" class="btn btn-whatsapp btn-sm">
           WhatsApp
         </a>
       </td>
@@ -835,31 +878,75 @@ async function abrirModalOrcamentoComServico(servicoId, clienteId) {
   }
 }
 
+let cacheOrcamentos = [];
+
+function isPropostaRecusada(status) {
+  if (!status) return false;
+  const norm = String(status).trim().toUpperCase();
+  return norm === 'RECUSADO' || norm === 'RECUSADA';
+}
+
 async function carregarOrcamentos() {
   try {
     const resp = await authFetch('/api/orcamentos');
     if (!resp.ok) return;
     const orcamentos = await resp.json();
-    renderTabelaOrcamentos(orcamentos);
-    atualizarDropdownOrcamentos(orcamentos);
+    cacheOrcamentos = Array.isArray(orcamentos) ? orcamentos : [];
+    filtrarOrcamentos();
+    atualizarDropdownOrcamentos(cacheOrcamentos);
   } catch (err) {
     console.error('Erro ao carregar orçamentos:', err);
   }
 }
 
-function renderTabelaOrcamentos(orcamentos) {
+function filtrarOrcamentos() {
+  const inputBusca = document.getElementById('busca-orcamentos');
+  const termo = normalizarTextoBusca(inputBusca ? inputBusca.value : '');
+  if (!termo) {
+    renderTabelaOrcamentos(cacheOrcamentos, false);
+    return;
+  }
+
+  const filtrados = cacheOrcamentos.filter(o => {
+    const clienteNome = o.cliente ? o.cliente.nome : '';
+    const servicoDesc = o.servico ? o.servico.descricao : '';
+    const servicoTipo = o.servico ? o.servico.tipo : '';
+    const dataEmissaoBR = formatarDataBR(o.dataEmissao);
+    const dataValidadeBR = calcularDataValidadeBR(o.dataEmissao, o.validade);
+    const valorFmt = formatarMoeda(o.valorTotal);
+    const statusRaw = String(o.statusOrcamento || o.status || 'PENDENTE');
+    const statusLabel = statusRaw.toUpperCase().startsWith('APROVAD')
+      ? 'Aprovado Aprovada'
+      : (statusRaw.toUpperCase().startsWith('RECUSAD') ? 'Recusado Recusada' : 'Pendente');
+
+    const alvo = normalizarTextoBusca(
+      `#${o.id} ${clienteNome} ${servicoDesc} ${servicoTipo} ${dataEmissaoBR} ${o.dataEmissao || ''} ${dataValidadeBR} ${valorFmt} ${o.valorTotal || ''} ${statusRaw} ${statusLabel}`
+    );
+    return alvo.includes(termo);
+  });
+
+  renderTabelaOrcamentos(filtrados, true);
+}
+
+function renderTabelaOrcamentos(orcamentos, filtroAtivo = false) {
   const tbody = document.getElementById('tabela-orcamentos-corpo');
   if (!tbody) return;
 
   if (!orcamentos || orcamentos.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="9" class="text-center">Nenhuma proposta emitida até o momento.</td></tr>';
+    const msg = filtroAtivo
+      ? 'Nenhuma proposta comercial encontrada para a busca informada.'
+      : 'Nenhuma proposta emitida até o momento.';
+    tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted">${msg}</td></tr>`;
     return;
   }
 
   tbody.innerHTML = orcamentos.map(o => {
     const clienteNome = o.cliente ? o.cliente.nome : 'N/A';
     const servicoDesc = o.servico ? o.servico.descricao : 'N/A';
-    const statusBadge = getStatusBadge(o.statusOrcamento);
+    const statusRaw = String(o.statusOrcamento || o.status || 'PENDENTE').trim().toUpperCase();
+    const isPendente = statusRaw === 'PENDENTE';
+    const isRecusada = isPropostaRecusada(statusRaw);
+    const statusBadge = getStatusBadge(statusRaw);
     const servico = o.servico;
     const temImposto = servico && (servico.imposto !== undefined || servico.valorBase !== undefined);
 
@@ -868,8 +955,8 @@ function renderTabelaOrcamentos(orcamentos) {
         <td>#${o.id}</td>
         <td><strong>${escapeHtml(clienteNome)}</strong></td>
         <td>${escapeHtml(servicoDesc)}</td>
-        <td>${escapeHtml(o.dataEmissao)}</td>
-        <td>${o.validade} dias</td>
+        <td>${escapeHtml(formatarDataBR(o.dataEmissao))}</td>
+        <td>Válida até ${escapeHtml(calcularDataValidadeBR(o.dataEmissao, o.validade))}</td>
         <td>
           <strong>${formatarMoeda(o.valorTotal)}</strong>
           ${temImposto ? `
@@ -886,12 +973,14 @@ function renderTabelaOrcamentos(orcamentos) {
           </button>
         </td>
         <td>
-          ${o.statusOrcamento === 'PENDENTE' ? `
+          ${isPendente ? `
             <button class="btn btn-secondary btn-sm" onclick="mudarStatusOrcamento(${o.id}, 'APROVADO')">Aprovar</button>
             <button class="btn btn-secondary btn-sm" onclick="mudarStatusOrcamento(${o.id}, 'RECUSADO')">Recusar</button>
-          ` : `
+          ` : (!isRecusada ? `
             <button class="btn btn-secondary btn-sm" onclick="abrirModalCobrancaParaOrcamento(${o.id})">Gerar Cobrança</button>
-          `}
+          ` : `
+            <span class="text-muted" style="font-size: 0.85rem;">—</span>
+          `)}
         </td>
       </tr>
     `;
@@ -978,6 +1067,11 @@ function initFinanceiro() {
 }
 
 function abrirModalCobrancaParaOrcamento(orcamentoId) {
+  const orc = cacheOrcamentos.find(o => String(o.id) === String(orcamentoId));
+  if (orc && isPropostaRecusada(orc.statusOrcamento || orc.status)) {
+    showToast('Não é permitido gerar cobrança para uma proposta recusada.', 'error');
+    return;
+  }
   const modal = document.getElementById('modal-cobranca');
   if (modal) {
     document.getElementById('cobranca-orcamento-select').value = orcamentoId;
@@ -988,8 +1082,9 @@ function abrirModalCobrancaParaOrcamento(orcamentoId) {
 function atualizarDropdownOrcamentos(orcamentos) {
   const sel = document.getElementById('cobranca-orcamento-select');
   if (!sel) return;
+  const elegiveis = (orcamentos || []).filter(o => !isPropostaRecusada(o.statusOrcamento || o.status));
   sel.innerHTML = '<option value="">Selecione um orçamento...</option>' +
-    orcamentos.map(o => {
+    elegiveis.map(o => {
       const clienteNome = o.cliente ? o.cliente.nome : '';
       return `<option value="${o.id}">#${o.id} - ${escapeHtml(clienteNome)} (${formatarMoeda(o.valorTotal)})</option>`;
     }).join('');
@@ -1020,23 +1115,59 @@ async function carregarExtrato() {
   }
 }
 
+let cacheCobrancas = [];
+
 async function carregarCobrancas() {
   try {
     const resp = await authFetch('/api/cobrancas');
     if (!resp.ok) return;
     const cobrancas = await resp.json();
-    renderTabelaCobrancas(cobrancas);
+    cacheCobrancas = Array.isArray(cobrancas) ? cobrancas : [];
+    filtrarCobrancas();
   } catch (err) {
     console.error('Erro ao carregar cobranças:', err);
   }
 }
 
-function renderTabelaCobrancas(cobrancas) {
+function filtrarCobrancas() {
+  const inputBusca = document.getElementById('busca-cobrancas');
+  const termo = normalizarTextoBusca(inputBusca ? inputBusca.value : '');
+  if (!termo) {
+    renderTabelaCobrancas(cacheCobrancas, false);
+    return;
+  }
+
+  const filtrados = cacheCobrancas.filter(c => {
+    const orc = c.orcamento;
+    const clienteNome = (orc && orc.cliente) ? orc.cliente.nome : '';
+    const servicoDesc = (orc && orc.servico) ? orc.servico.descricao : '';
+    const orcIdStr = orc ? `#${orc.id}` : '';
+    const vencBR = formatarDataBR(c.dataVencimento);
+    const pagBR = c.dataPagamento ? formatarDataBR(c.dataPagamento) : '';
+    const valorFmt = formatarMoeda(c.valor);
+    const statusRaw = String(c.statusCobranca || 'EM_ABERTO');
+    const statusLabel = statusRaw === 'PAGO'
+      ? 'Pago Liquidado'
+      : (statusRaw === 'ATRASADO' ? 'Atrasado Vencido' : 'Em Aberto Pendente');
+
+    const alvo = normalizarTextoBusca(
+      `#${c.id} ${orcIdStr} ${clienteNome} ${servicoDesc} ${vencBR} ${c.dataVencimento || ''} ${pagBR} ${c.dataPagamento || ''} ${valorFmt} ${c.valor || ''} ${statusRaw} ${statusLabel}`
+    );
+    return alvo.includes(termo);
+  });
+
+  renderTabelaCobrancas(filtrados, true);
+}
+
+function renderTabelaCobrancas(cobrancas, filtroAtivo = false) {
   const tbody = document.getElementById('tabela-cobrancas-corpo');
   if (!tbody) return;
 
   if (!cobrancas || cobrancas.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" class="text-center">Nenhum registro financeiro encontrado.</td></tr>';
+    const msg = filtroAtivo
+      ? 'Nenhuma cobrança encontrada para a busca informada.'
+      : 'Nenhum registro financeiro encontrado.';
+    tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted">${msg}</td></tr>`;
     return;
   }
 
@@ -1051,8 +1182,8 @@ function renderTabelaCobrancas(cobrancas) {
         <td>#${c.id}</td>
         <td><strong>${escapeHtml(clienteNome)}</strong></td>
         <td>${orcDesc}</td>
-        <td>${escapeHtml(c.dataVencimento)}</td>
-        <td>${c.dataPagamento ? escapeHtml(c.dataPagamento) : '<span class="text-muted">—</span>'}</td>
+        <td>${escapeHtml(formatarDataBR(c.dataVencimento))}</td>
+        <td>${c.dataPagamento ? escapeHtml(formatarDataBR(c.dataPagamento)) : '<span class="text-muted">—</span>'}</td>
         <td><strong>${formatarMoeda(c.valor)}</strong></td>
         <td>${statusBadge}</td>
         <td>
@@ -1072,7 +1203,7 @@ function renderTabelaCobrancas(cobrancas) {
 }
 
 async function registrarPagamentoCobranca(id) {
-  const dataHoje = new Date().toISOString().split('T')[0];
+  const dataHoje = obterDataLocalISO();
   try {
     const resp = await authFetch(`/api/cobrancas/${id}/pagar`, {
       method: 'POST',
@@ -1148,12 +1279,92 @@ function parseNumeroBRL(val) {
   return isNaN(num) ? 0 : num;
 }
 
+const formatadorMoedaBRL = new Intl.NumberFormat('pt-BR', {
+  style: 'currency',
+  currency: 'BRL'
+});
+
 function formatarMoeda(val) {
   const num = parseNumeroBRL(val);
-  const partes = Math.abs(num).toFixed(2).split('.');
-  const inteiraComPontos = partes[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-  const prefixo = num < 0 ? '-R$ ' : 'R$ ';
-  return `${prefixo}${inteiraComPontos},${partes[1]}`;
+  return formatadorMoedaBRL.format(num).replace(/\u00a0/g, ' ');
+}
+
+/**
+ * Converte uma data ISO (yyyy-MM-dd) para o padrão brasileiro (dd/MM/yyyy).
+ * Realiza o split manual das partes da string para evitar retrocesso de 1 dia no fuso horário (-03:00).
+ */
+function formatarDataBR(dataIso) {
+  if (!dataIso) return '';
+  const limpa = String(dataIso).trim();
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(limpa)) {
+    return limpa;
+  }
+  const parteData = limpa.split('T')[0];
+  const partes = parteData.split('-');
+  if (partes.length === 3 && partes[0].length === 4) {
+    const [ano, mes, dia] = partes;
+    return `${dia.padStart(2, '0')}/${mes.padStart(2, '0')}/${ano}`;
+  }
+  return limpa;
+}
+
+/**
+ * Calcula a data final exata de vencimento da proposta somando os dias de validade à data de emissão,
+ * utilizando data local new Date(ano, mes - 1, dia) para evitar desvios de fuso horário (-03:00).
+ */
+function calcularDataValidadeBR(dataEmissao, diasValidade) {
+  if (!dataEmissao) return '';
+  const limpa = String(dataEmissao).trim().split('T')[0];
+  let ano, mes, dia;
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(limpa)) {
+    const partes = limpa.split('/');
+    dia = parseInt(partes[0], 10);
+    mes = parseInt(partes[1], 10);
+    ano = parseInt(partes[2], 10);
+  } else {
+    const partes = limpa.split('-');
+    if (partes.length !== 3) return formatarDataBR(limpa);
+    ano = parseInt(partes[0], 10);
+    mes = parseInt(partes[1], 10);
+    dia = parseInt(partes[2], 10);
+  }
+  const dias = parseInt(diasValidade, 10) || 0;
+  const dataLimite = new Date(ano, mes - 1, dia);
+  dataLimite.setDate(dataLimite.getDate() + dias);
+  const d = String(dataLimite.getDate()).padStart(2, '0');
+  const m = String(dataLimite.getMonth() + 1).padStart(2, '0');
+  const y = dataLimite.getFullYear();
+  return `${d}/${m}/${y}`;
+}
+
+/**
+ * Retorna a data local no formato yyyy-MM-dd compatível com o atributo value de <input type="date">.
+ */
+function obterDataLocalISO(data = new Date()) {
+  const ano = data.getFullYear();
+  const mes = String(data.getMonth() + 1).padStart(2, '0');
+  const dia = String(data.getDate()).padStart(2, '0');
+  return `${ano}-${mes}-${dia}`;
+}
+
+/**
+ * Extrai apenas o primeiro nome do cliente com fallback defensivo para "Cliente".
+ */
+function extrairPrimeiroNome(nomeCompleto) {
+  if (!nomeCompleto || typeof nomeCompleto !== 'string') return 'Cliente';
+  const limpo = nomeCompleto.trim();
+  if (!limpo) return 'Cliente';
+  return limpo.split(/\s+/)[0] || 'Cliente';
+}
+
+/**
+ * Gera link de contato rápido para o WhatsApp utilizando apenas o primeiro nome na saudação.
+ */
+function gerarLinkWhatsAppContatoRapido(whatsApp, nomeCompleto) {
+  const primeiroNome = extrairPrimeiroNome(nomeCompleto);
+  const saudacao = encodeURIComponent(`Olá, ${primeiroNome}! Tudo bem?`);
+  const numero = String(whatsApp || '').replace(/\D/g, '');
+  return `https://wa.me/${numero}?text=${saudacao}`;
 }
 
 function configurarCamposMoeda() {
@@ -1171,8 +1382,10 @@ function aplicarMascaraMoeda(input) {
   }
 
   input.addEventListener('focus', () => {
-    const num = parseNumeroBRL(input.value);
-    if (num > 0) {
+    const raw = input.value.trim();
+    if (!raw) return;
+    const num = parseNumeroBRL(raw);
+    if (num >= 0) {
       input.value = num.toFixed(2).replace('.', ',');
       input.select();
     } else {
@@ -1181,11 +1394,16 @@ function aplicarMascaraMoeda(input) {
   });
 
   input.addEventListener('blur', () => {
-    const num = parseNumeroBRL(input.value);
-    if (num > 0) {
-      input.value = formatarMoeda(num);
-    } else {
+    const raw = input.value.trim();
+    if (!raw) {
       input.value = '';
+    } else {
+      const num = parseNumeroBRL(raw);
+      if (num >= 0) {
+        input.value = formatarMoeda(num);
+      } else {
+        input.value = '';
+      }
     }
     simularCalculo();
   });
@@ -1199,8 +1417,9 @@ function escapeHtml(str) {
 }
 
 function getStatusBadge(status) {
-  if (status === 'APROVADO') return '<span class="badge badge-success">Aprovado</span>';
-  if (status === 'RECUSADO') return '<span class="badge badge-danger">Recusado</span>';
+  const s = String(status || '').trim().toUpperCase();
+  if (s === 'APROVADO' || s === 'APROVADA') return '<span class="badge badge-success">Aprovado</span>';
+  if (s === 'RECUSADO' || s === 'RECUSADA') return '<span class="badge badge-danger">Recusado</span>';
   return '<span class="badge badge-warning">Pendente</span>';
 }
 
@@ -1208,4 +1427,33 @@ function getStatusCobrancaBadge(status) {
   if (status === 'PAGO') return '<span class="badge badge-success">Pago</span>';
   if (status === 'ATRASADO') return '<span class="badge badge-danger">Atrasado</span>';
   return '<span class="badge badge-warning">Em Aberto</span>';
+}
+
+/* ==========================================================================
+   12. BUSCA E FILTRO DINÂMICO EM TEMPO REAL (CLIENT-SIDE)
+   ========================================================================== */
+function normalizarTextoBusca(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function initBuscaDinamica() {
+  const inputClientes = document.getElementById('busca-clientes');
+  if (inputClientes) {
+    inputClientes.addEventListener('input', filtrarClientes);
+  }
+
+  const inputOrcamentos = document.getElementById('busca-orcamentos');
+  if (inputOrcamentos) {
+    inputOrcamentos.addEventListener('input', filtrarOrcamentos);
+  }
+
+  const inputCobrancas = document.getElementById('busca-cobrancas');
+  if (inputCobrancas) {
+    inputCobrancas.addEventListener('input', filtrarCobrancas);
+  }
 }

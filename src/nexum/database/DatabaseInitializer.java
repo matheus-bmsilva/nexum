@@ -49,6 +49,17 @@ public class DatabaseInitializer {
                 // Coluna já existe
             }
 
+            // Migração defensiva: garante existência da coluna rbt12 em bancos pré-existentes
+            try {
+                if (isPostgres) {
+                    stmt.execute("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS rbt12 DOUBLE PRECISION DEFAULT 0.0;");
+                } else {
+                    stmt.execute("ALTER TABLE usuarios ADD COLUMN rbt12 REAL DEFAULT 0.0;");
+                }
+            } catch (SQLException ignored) {
+                // Coluna já existe
+            }
+
         } catch (SQLException e) {
             throw new DatabaseException("Falha ao inicializar o esquema DDL do banco de dados.", e);
         }
@@ -63,7 +74,8 @@ public class DatabaseInitializer {
                 email VARCHAR(255),
                 senha TEXT NOT NULL,
                 whatsapp VARCHAR(50) NOT NULL,
-                cnpj VARCHAR(20) NOT NULL UNIQUE
+                cnpj VARCHAR(20) NOT NULL UNIQUE,
+                rbt12 DOUBLE PRECISION NOT NULL DEFAULT 0.0
             )
             """,
             """
@@ -148,7 +160,8 @@ public class DatabaseInitializer {
                 email TEXT,
                 senha TEXT NOT NULL,
                 whatsapp TEXT NOT NULL,
-                cnpj TEXT NOT NULL UNIQUE
+                cnpj TEXT NOT NULL UNIQUE,
+                rbt12 REAL NOT NULL DEFAULT 0.0
             )
             """,
             """

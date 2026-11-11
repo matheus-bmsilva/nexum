@@ -74,17 +74,19 @@ public class OrcamentoService {
             throw new ValidationException("O cliente não possui telefone de WhatsApp cadastrado.");
         }
 
+        String primeiroNome = cliente.getPrimeiroNome();
         String servicoDesc = (orcamento.getServico() != null) ? orcamento.getServico().getDescricao() : "Projeto Arquitetônico";
-        String valorFmt = String.format(Locale.GERMANY, "%.2f", orcamento.getValorTotal());
+        String valorFmt = String.format(Locale.GERMANY, "%,.2f", orcamento.getValorTotal());
+        String dataValidadeFmt = orcamento.calcularDataValidadeFormatada();
 
         String mensagem = String.format(
             "Olá, %s! Tudo bem?\n\n" +
             "Segue a proposta orçamentária para o seu projeto de arquitetura:\n\n" +
             "• Projeto: %s\n" +
             "• Investimento Total: R$ %s\n" +
-            "• Validade da Proposta: %d dias\n\n" +
+            "• Proposta válida até %s\n\n" +
             "Qualquer dúvida técnica ou ajuste de escopo, estou à sua inteira disposição!",
-            cliente.getNome(), servicoDesc, valorFmt, orcamento.getValidade()
+            primeiroNome, servicoDesc, valorFmt, dataValidadeFmt
         );
 
         String textoCodificado = URLEncoder.encode(mensagem, StandardCharsets.UTF_8);

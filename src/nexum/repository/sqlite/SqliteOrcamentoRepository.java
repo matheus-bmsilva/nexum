@@ -163,7 +163,19 @@ public class SqliteOrcamentoRepository implements OrcamentoRepository {
         int validade = rs.getInt("validade");
         double valorTotal = rs.getDouble("valor_total");
         String statusStr = rs.getString("status_orcamento");
-        StatusOrcamento status = (statusStr != null) ? StatusOrcamento.valueOf(statusStr) : StatusOrcamento.PENDENTE;
+        StatusOrcamento status = StatusOrcamento.PENDENTE;
+        if (statusStr != null && !statusStr.isBlank()) {
+            String norm = statusStr.trim().toUpperCase();
+            if ("RECUSADA".equals(norm)) {
+                norm = "RECUSADO";
+            } else if ("APROVADA".equals(norm)) {
+                norm = "APROVADO";
+            }
+            try {
+                status = StatusOrcamento.valueOf(norm);
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
 
         int servicoId = rs.getInt("servico_id");
         int clienteId = rs.getInt("cliente_id");
