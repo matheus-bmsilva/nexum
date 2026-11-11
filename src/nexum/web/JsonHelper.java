@@ -95,8 +95,9 @@ public class JsonHelper {
     public static String memoriaToJson(PrecificacaoService.MemoriaCalculo m) {
         if (m == null) return "{}";
         return String.format(Locale.US,
-            "{\"tipoServico\": \"%s\", \"valorBase\": %.2f, \"aliquotaImposto\": %.4f, \"valorImposto\": %.2f, \"valorTotalFinal\": %.2f}",
-            m.tipoServico(), m.valorBase(), m.aliquotaImposto(), m.valorImposto(), m.valorTotalFinal()
+            "{\"tipoServico\": \"%s\", \"valorBase\": %.2f, \"aliquotaImposto\": %.4f, \"valorImposto\": %.2f, \"valorTotalFinal\": %.2f, \"faixaSimples\": %d, \"rbt12\": %.2f, \"parcelaADeduzir\": %.2f, \"descricaoFaixa\": \"%s\"}",
+            m.tipoServico(), m.valorBase(), m.aliquotaImposto(), m.valorImposto(), m.valorTotalFinal(),
+            m.faixaSimples(), m.rbt12(), m.parcelaADeduzir(), HttpHelper.escapeJson(m.descricaoFaixa() != null ? m.descricaoFaixa() : "")
         );
     }
 

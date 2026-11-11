@@ -369,14 +369,15 @@ function initEtapasManager() {
     row.className = 'etapa-item-row';
     row.innerHTML = `
       <select class="etapa-tipo">
+        <option value="" selected disabled>Selecione uma etapa</option>
         <option value="LEVANTAMENTO">1. Levantamento Cadastral</option>
         <option value="ESTUDO_PRELIMINAR">2. Estudo Preliminar</option>
         <option value="ANTEPROJETO">3. Anteprojeto</option>
         <option value="PROJETO_LEGAL">4. Projeto Legal / Prefeitura</option>
-        <option value="PROJETO_EXECUTIVO" selected>5. Projeto Executivo Detalhado</option>
+        <option value="PROJETO_EXECUTIVO">5. Projeto Executivo Detalhado</option>
         <option value="EXECUCAO_ACOMPANHAMENTO">6. Execução e Acompanhamento</option>
       </select>
-      <input type="number" class="etapa-valor" placeholder="Valor (R$)" step="50" min="0">
+      <input type="number" class="etapa-valor" placeholder="Valor (R$)" step="any" min="0">
       <button type="button" class="btn-remove-etapa" title="Remover etapa">&times;</button>
     `;
     lista.appendChild(row);
@@ -384,6 +385,7 @@ function initEtapasManager() {
       row.remove();
       simularCalculo();
     });
+    row.querySelector('.etapa-tipo').addEventListener('change', simularCalculo);
     row.querySelector('.etapa-valor').addEventListener('input', simularCalculo);
   });
 
@@ -393,6 +395,9 @@ function initEtapasManager() {
       simularCalculo();
     });
   });
+  lista.querySelectorAll('.etapa-tipo').forEach(select => {
+    select.addEventListener('change', simularCalculo);
+  });
   lista.querySelectorAll('.etapa-valor').forEach(input => {
     input.addEventListener('input', simularCalculo);
   });
@@ -400,11 +405,11 @@ function initEtapasManager() {
 
 /* ==========================================================================
    6. CÁLCULO E SIMULAÇÃO DE HONORÁRIOS EM TEMPO REAL
-   (Sem botão redundante: cálculo automático instantâneo)
+   (Sem botão redundante: cálculo automático instantâneo com Simples Nacional)
    ========================================================================== */
 function initCalculoSimulacao() {
   const inputsParaMonitorar = [
-    'm2-area', 'm2-valor', 'hora-horas', 'hora-valor', 'perc-custo', 'perc-taxa'
+    'servico-rbt12', 'm2-area', 'm2-valor', 'hora-horas', 'hora-valor', 'perc-custo', 'perc-taxa'
   ];
   inputsParaMonitorar.forEach(id => {
     const el = document.getElementById(id);
@@ -415,7 +420,9 @@ function initCalculoSimulacao() {
 function coletarDadosModalidade() {
   const radioChecked = document.querySelector('input[name="modalidade"]:checked');
   const modalidade = radioChecked ? radioChecked.value : 'METRO_QUADRADO';
-  const payload = { tipo: modalidade, imposto: 0.06 };
+  const rbt12Input = document.getElementById('servico-rbt12');
+  const rbt12 = rbt12Input ? (parseFloat(rbt12Input.value) || 0) : 0;
+  const payload = { tipo: modalidade, rbt12: rbt12, imposto: 0.06 };
 
   if (modalidade === 'METRO_QUADRADO') {
     payload.area = parseFloat(document.getElementById('m2-area').value) || 0;
@@ -424,9 +431,12 @@ function coletarDadosModalidade() {
     const rows = document.querySelectorAll('#lista-etapas .etapa-item-row');
     const itens = [];
     rows.forEach(r => {
-      const etapa = r.querySelector('.etapa-tipo').value;
+      const select = r.querySelector('.etapa-tipo');
+      const etapa = select ? select.value : '';
       const valor = parseFloat(r.querySelector('.etapa-valor').value) || 0;
-      itens.push({ etapa, valor });
+      if (etapa) {
+        itens.push({ etapa, valor });
+      }
     });
     payload.itensEtapas = itens;
   } else if (modalidade === 'HORA') {
@@ -462,9 +472,17 @@ async function simularCalculo() {
 
 function atualizarPainelMemoria(m) {
   const elBase = document.getElementById('memoria-base');
+  const elFaixa = document.getElementById('memoria-faixa');
+  const elAliquota = document.getElementById('memoria-aliquota');
   const elImposto = document.getElementById('memoria-imposto');
   const elTotal = document.getElementById('memoria-total');
+
   if (elBase) elBase.textContent = formatarMoeda(m.valorBase || 0);
+  if (elFaixa) elFaixa.textContent = m.descricaoFaixa || (m.faixaSimples ? `${m.faixaSimples}ª Faixa` : '1ª Faixa');
+  if (elAliquota) {
+    const aliqPct = ((m.aliquotaImposto || 0) * 100).toFixed(2).replace('.', ',');
+    elAliquota.textContent = `${aliqPct}%`;
+  }
   if (elImposto) elImposto.textContent = formatarMoeda(m.valorImposto || 0);
   if (elTotal) elTotal.textContent = formatarMoeda(m.valorTotalFinal || 0);
 }
@@ -553,13 +571,18 @@ function initClientes() {
 async function carregarClientes() {
   try {
     const resp = await authFetch('/api/clientes');
-    if (!resp.ok) return;
+    if (!resp.ok) {
+      renderTabelaClientes([]);
+      return;
+    }
 
-    const clientes = await resp.json();
+    const data = await resp.json();
+    const clientes = Array.isArray(data) ? data : (data && Array.isArray(data.clientes) ? data.clientes : []);
     renderTabelaClientes(clientes);
     atualizarDropdownsClientes(clientes);
   } catch (err) {
     console.error('Erro ao listar clientes:', err);
+    renderTabelaClientes([]);
   }
 }
 
@@ -568,7 +591,7 @@ function renderTabelaClientes(clientes) {
   if (!tbody) return;
 
   if (!clientes || clientes.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="4" class="text-center">Nenhum cliente cadastrado ainda.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Não há clientes cadastrados.</td></tr>';
     return;
   }
 
@@ -981,7 +1004,11 @@ async function deletarCobranca(id) {
    11. UTILITÁRIOS GERAIS
    ========================================================================== */
 function formatarMoeda(val) {
-  return (val || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const num = typeof val === 'number' ? val : (parseFloat(val) || 0);
+  const partes = Math.abs(num).toFixed(2).split('.');
+  const inteiraComPontos = partes[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  const prefixo = num < 0 ? '-R$ ' : 'R$ ';
+  return `${prefixo}${inteiraComPontos},${partes[1]}`;
 }
 
 function escapeHtml(str) {

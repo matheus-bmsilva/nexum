@@ -278,6 +278,13 @@ select:focus {
   box-shadow: 0 0 0 1px var(--border-focus);
 }
 
+.form-help {
+  display: block;
+  font-size: 0.74rem;
+  color: var(--neutral-500);
+  margin-top: 0.25rem;
+}
+
 /* SELETOR DE MODALIDADE POLIMÓRFICA */
 .modalidade-selector {
   display: grid;
@@ -775,5 +782,14 @@ select:focus {
 .auth-form {
   display: flex;
   flex-direction: column;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.text-muted {
+  color: var(--neutral-500);
+  font-style: italic;
 }
 

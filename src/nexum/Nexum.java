@@ -20,7 +20,7 @@ public class Nexum {
     public static void main(String[] args) {
         System.out.println("Inicializando o Nexum - Gestão para Arquitetos...");
         DatabaseInitializer.initialize();
-        System.out.println("Banco de dados SQLite inicializado com sucesso.");
+        System.out.println("Banco de dados (" + (nexum.database.ConnectionFactory.isPostgres() ? "PostgreSQL" : "SQLite") + ") inicializado com sucesso.");
 
         int port = DEFAULT_PORT;
         String portEnv = System.getenv("PORT");

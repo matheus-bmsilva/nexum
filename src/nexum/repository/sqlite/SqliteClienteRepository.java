@@ -39,7 +39,9 @@ public class SqliteClienteRepository implements ClienteRepository {
             }
             return cliente;
         } catch (SQLException e) {
-            if (e.getMessage() != null && e.getMessage().contains("UNIQUE")) {
+            String msg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
+            String state = e.getSQLState() != null ? e.getSQLState() : "";
+            if ("23505".equals(state) || msg.contains("unique") || msg.contains("duplicate key")) {
                 throw new ValidationException("Violação de unicidade: o CPF informado já está cadastrado no sistema.", e);
             }
             throw new DatabaseException("Erro ao salvar cliente no banco de dados.", e);
@@ -114,7 +116,9 @@ public class SqliteClienteRepository implements ClienteRepository {
 
             stmt.executeUpdate();
         } catch (SQLException e) {
-            if (e.getMessage() != null && e.getMessage().contains("UNIQUE")) {
+            String msg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
+            String state = e.getSQLState() != null ? e.getSQLState() : "";
+            if ("23505".equals(state) || msg.contains("unique") || msg.contains("duplicate key")) {
                 throw new ValidationException("Violação de unicidade: o CPF informado já pertence a outro cliente.", e);
             }
             throw new DatabaseException("Erro ao atualizar cliente.", e);

@@ -275,7 +275,7 @@ public class SqliteServicoRepository implements ServicoRepository {
 
     private void setNull(PreparedStatement stmt, int... indices) throws SQLException {
         for (int idx : indices) {
-            stmt.setNull(idx, Types.REAL);
+            stmt.setNull(idx, Types.DOUBLE);
         }
     }
 }

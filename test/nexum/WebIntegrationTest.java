@@ -40,6 +40,14 @@ public class WebIntegrationTest {
         DatabaseInitializer.initialize();
         System.out.println("[OK] Banco de testes inicializado.");
 
+        // 1.1. Teste de flexibilidade da ConnectionFactory (PostgreSQL vs SQLite)
+        ConnectionFactory.setConnectionConfig("jdbc:postgresql://localhost:5432/nexum_cloud", "postgres", "secret123");
+        assert ConnectionFactory.isPostgres() : "Deveria identificar PostgreSQL como ativo";
+        assert ConnectionFactory.getDbPath().equals("jdbc:postgresql://localhost:5432/nexum_cloud") : "URL PostgreSQL incorreta";
+        ConnectionFactory.setDbPath(TEST_DB_PATH);
+        assert !ConnectionFactory.isPostgres() : "Deveria voltar para SQLite de teste";
+        System.out.println("[OK] ConnectionFactory: Resolução dinâmica de PostgreSQL/SQLite validada.");
+
         // 2. Validação Matemática de Documentos (CPF e CNPJ)
         assert DocumentoValidator.isCpfValido("529.982.247-25") : "CPF válido deveria ser aprovado";
         assert !DocumentoValidator.isCpfValido("111.111.111-11") : "CPF com números repetidos deve ser rejeitado";
@@ -52,6 +60,10 @@ public class WebIntegrationTest {
 
         // 3. Testes de ClienteService e Unicidade
         ClienteService clienteService = new ClienteService();
+
+        // 3.0. Listagem inicial quando a tabela está vazia
+        assert clienteService.listarTodos().isEmpty() : "A tabela de clientes deve iniciar vazia";
+        System.out.println("[OK] ClienteService: Listagem de clientes vazia tratada corretamente.");
 
         // 3.1. Rejeição de CPF inválido
         try {
@@ -78,42 +90,105 @@ public class WebIntegrationTest {
 
         // 4.1. Rejeição de CNPJ inválido
         try {
-            usuarioService.cadastrar("Studio Fake", "fake@nexus.arq", "(11) 91234-5678", "00.000.000/0000-00", "senha123");
+            usuarioService.cadastrar("Studio Fake", "fake@nexus.arq", "(11) 91234-5678", "00.000.000/0000-00", "Segredo@Forte2026");
             assert false : "Deveria ter bloqueado CNPJ inválido";
         } catch (ValidationException e) {
             System.out.println("[OK] UsuarioService: Bloqueio de CNPJ inválido validado com sucesso.");
         }
 
-        // 4.2. Cadastro de arquiteto com CNPJ válido
+        // 4.2. Rejeição de senha fraca (menos de 12 caracteres, sem maiúscula ou sem caractere especial)
+        try {
+            usuarioService.cadastrar("Studio Nexus", "teste@nexus.arq", "(11) 91234-5678", "11.222.333/0001-81", "fraca123");
+            assert false : "Deveria ter bloqueado senha com menos de 12 caracteres";
+        } catch (ValidationException e) {
+            System.out.println("[OK] UsuarioService: Bloqueio de senha curta validado com sucesso.");
+        }
+
+        try {
+            usuarioService.cadastrar("Studio Nexus", "teste@nexus.arq", "(11) 91234-5678", "11.222.333/0001-81", "senhalongasemespecial123");
+            assert false : "Deveria ter bloqueado senha sem caractere especial e maiúscula";
+        } catch (ValidationException e) {
+            System.out.println("[OK] UsuarioService: Bloqueio de senha sem maiúscula/especial validado com sucesso.");
+        }
+
+        // 4.3. Cadastro de arquiteto com CNPJ válido e senha forte (>= 12 chars, maiúscula e especial)
         Usuario arquiteto = usuarioService.cadastrar(
-            "Studio Nexus Arquitetura", "contato@nexus.arq", "(11) 91234-5678", "11.222.333/0001-81", "segredoForte123"
+            "Studio Nexus Arquitetura", "contato@nexus.arq", "(11) 91234-5678", "11.222.333/0001-81", "Segredo@Forte2026"
         );
         assert arquiteto.getId() > 0 : "ID de usuário deve ser gerado";
 
-        // 4.3. Bloqueio de CNPJ duplicado
+        // 4.4. Bloqueio de CNPJ duplicado
         try {
-            usuarioService.cadastrar("Outro Studio", "outro@nexus.arq", "(11) 99999-8888", "11.222.333/0001-81", "outraSenha123");
+            usuarioService.cadastrar("Outro Studio", "outro@nexus.arq", "(11) 99999-8888", "11.222.333/0001-81", "Outra@SenhaForte2026");
             assert false : "Deveria ter bloqueado CNPJ duplicado";
         } catch (ValidationException e) {
             System.out.println("[OK] UsuarioService: Bloqueio de CNPJ duplicado validado com sucesso.");
         }
 
-        // 4.4. Login com sucesso (por CNPJ e por E-mail)
-        Usuario logadoCnpj = usuarioService.login("11.222.333/0001-81", "segredoForte123");
+        // 4.5. Login com sucesso (por CNPJ e por E-mail)
+        Usuario logadoCnpj = usuarioService.login("11.222.333/0001-81", "Segredo@Forte2026");
         assert logadoCnpj.getId() == arquiteto.getId() : "Login por CNPJ falhou";
 
-        Usuario logadoEmail = usuarioService.login("contato@nexus.arq", "segredoForte123");
+        Usuario logadoEmail = usuarioService.login("contato@nexus.arq", "Segredo@Forte2026");
         assert logadoEmail.getId() == arquiteto.getId() : "Login por e-mail falhou";
 
-        // 4.5. Bloqueio de senha incorreta
+        // 4.6. Bloqueio de senha incorreta
         try {
-            usuarioService.login("contato@nexus.arq", "senhaErrada");
+            usuarioService.login("contato@nexus.arq", "SenhaErrada@2026");
             assert false : "Deveria ter bloqueado senha incorreta";
         } catch (ValidationException e) {
             System.out.println("[OK] UsuarioService: Login com PBKDF2 e bloqueio de senha incorreta validados.");
         }
 
-        // 5. Testes de PrecificacaoService (Polimorfismo & Memória de Cálculo)
+        // 5. Testes de PrecificacaoService e SimplesNacionalService (Anexo III)
+        nexum.service.SimplesNacionalService simplesService = new nexum.service.SimplesNacionalService();
+
+        // 5.1. Faixa 1 (<= 180.000)
+        var resF1 = simplesService.calcular(150000.0);
+        assert resF1.faixa() == 1 : "Deveria ser Faixa 1";
+        assert Math.abs(resF1.aliquotaEfetiva() - 0.060) < 0.0001 : "Alíquota efetiva Faixa 1 deve ser 6.00%";
+
+        // 5.2. Faixa 2 (180.000,01 a 360.000,00)
+        var resF2 = simplesService.calcular(300000.0);
+        assert resF2.faixa() == 2 : "Deveria ser Faixa 2";
+        // ((300000 * 0.112) - 9360) / 300000 = (33600 - 9360) / 300000 = 24240 / 300000 = 0.0808 (8.08%)
+        assert Math.abs(resF2.aliquotaEfetiva() - 0.0808) < 0.0001 : "Alíquota efetiva Faixa 2 deve ser 8.08%";
+
+        // 5.3. Faixa 3 (360.000,01 a 720.000,00)
+        var resF3 = simplesService.calcular(500000.0);
+        assert resF3.faixa() == 3 : "Deveria ser Faixa 3";
+        // ((500000 * 0.135) - 17640) / 500000 = (67500 - 17640) / 500000 = 49860 / 500000 = 0.09972
+        assert Math.abs(resF3.aliquotaEfetiva() - 0.09972) < 0.0001 : "Alíquota efetiva Faixa 3 incorreta";
+
+        // 5.4. Faixa 4 (720.000,01 a 1.800.000,00)
+        var resF4 = simplesService.calcular(1000000.0);
+        assert resF4.faixa() == 4 : "Deveria ser Faixa 4";
+        // ((1000000 * 0.16) - 35640) / 1000000 = (160000 - 35640) / 1000000 = 124360 / 1000000 = 0.12436
+        assert Math.abs(resF4.aliquotaEfetiva() - 0.12436) < 0.0001 : "Alíquota efetiva Faixa 4 incorreta";
+
+        // 5.5. Faixa 5 (1.800.000,01 a 3.600.000,00)
+        var resF5 = simplesService.calcular(2000000.0);
+        assert resF5.faixa() == 5 : "Deveria ser Faixa 5";
+        // ((2000000 * 0.21) - 125640) / 2000000 = (420000 - 125640) / 2000000 = 294360 / 2000000 = 0.14718
+        assert Math.abs(resF5.aliquotaEfetiva() - 0.14718) < 0.0001 : "Alíquota efetiva Faixa 5 incorreta";
+
+        // 5.6. Faixa 6 (3.600.000,01 a 4.800.000,00)
+        var resF6 = simplesService.calcular(4000000.0);
+        assert resF6.faixa() == 6 : "Deveria ser Faixa 6";
+        // ((4000000 * 0.33) - 648000) / 4000000 = (1320000 - 648000) / 4000000 = 672000 / 4000000 = 0.168
+        assert Math.abs(resF6.aliquotaEfetiva() - 0.1680) < 0.0001 : "Alíquota efetiva Faixa 6 incorreta";
+
+        // 5.7. Excesso de teto (> 4.800.000,00)
+        try {
+            simplesService.calcular(5000000.0);
+            assert false : "Deveria ter lançado ValidationException para RBT12 acima de 4.8M";
+        } catch (ValidationException e) {
+            System.out.println("[OK] SimplesNacionalService: Bloqueio de RBT12 > 4.8M validado.");
+        }
+
+        System.out.println("[OK] SimplesNacionalService: Todas as 6 faixas do Anexo III validadas com sucesso.");
+
+        // 5.8. PrecificacaoService com integração ao Simples Nacional
         PrecificacaoService precificacaoService = new PrecificacaoService();
 
         ServicoPorMetroQuadrado sM2 = precificacaoService.criarServicoMetroQuadrado(
@@ -123,6 +198,13 @@ public class WebIntegrationTest {
         assert Math.abs(memM2.valorBase() - 5000.0) < 0.01 : "Base M2 incorreta";
         assert Math.abs(memM2.valorTotalFinal() - 5300.0) < 0.01 : "Total M2 incorreto";
 
+        // Memória com RBT12 Faixa 2 (R$ 300.000) -> 8.08%
+        PrecificacaoService.MemoriaCalculo memM2Simples = precificacaoService.calcularMemoria(sM2, 300000.0);
+        assert memM2Simples.faixaSimples() == 2 : "Faixa deve ser 2";
+        assert Math.abs(memM2Simples.aliquotaImposto() - 0.0808) < 0.001 : "Alíquota efetiva deve ser 8.08%";
+        assert Math.abs(memM2Simples.valorImposto() - 404.0) < 0.01 : "Imposto deve ser 404.00";
+        assert Math.abs(memM2Simples.valorTotalFinal() - 5404.0) < 0.01 : "Total com imposto efetivo deve ser 5404.00";
+
         List<ItemEtapa> itens = new ArrayList<>();
         itens.add(new ItemEtapa(Etapa.LEVANTAMENTO, 1200.0));
         itens.add(new ItemEtapa(Etapa.PROJETO_EXECUTIVO, 3800.0));
@@ -131,7 +213,7 @@ public class WebIntegrationTest {
         );
         PrecificacaoService.MemoriaCalculo memEtapa = precificacaoService.calcularMemoria(sEtapa);
         assert Math.abs(memEtapa.valorTotalFinal() - 5300.0) < 0.01 : "Total Etapa incorreto";
-        System.out.println("[OK] PrecificacaoService: Reconstrução polimórfica e tributação validadas.");
+        System.out.println("[OK] PrecificacaoService: Reconstrução polimórfica e Simples Nacional validados.");
 
         // 6. Testes de OrcamentoService e link de WhatsApp
         OrcamentoService orcamentoService = new OrcamentoService();
@@ -183,11 +265,12 @@ public class WebIntegrationTest {
             );
             assert indexResp.statusCode() == 200 : "Index HTML status deveria ser 200";
             assert indexResp.body().contains("Nexum") : "Página deve conter Nexum";
+            assert indexResp.body().contains("Não há clientes cadastrados.") : "HTML deve conter mensagem para lista vazia";
             assert !indexResp.body().contains("Simular Cálculo") : "Botão inútil de simulação deve ter sido removido";
-            System.out.println("[OK] NexumServer: Entrega de HTML sem botão de simulação validada.");
+            System.out.println("[OK] NexumServer: Entrega de HTML com mensagem amigável de lista vazia validada.");
 
             // 8.2. POST /api/auth/login via HTTP API
-            String payloadLogin = "{\"identificador\": \"contato@nexus.arq\", \"senha\": \"segredoForte123\"}";
+            String payloadLogin = "{\"identificador\": \"contato@nexus.arq\", \"senha\": \"Segredo@Forte2026\"}";
             HttpResponse<String> loginResp = client.send(
                 HttpRequest.newBuilder()
                     .uri(URI.create("http://localhost:" + TEST_PORT + "/api/auth/login"))
@@ -216,8 +299,8 @@ public class WebIntegrationTest {
             assert perfilResp.body().contains("Studio Nexus Arquitetura") : "Perfil deve conter o nome do arquiteto";
             System.out.println("[OK] NexumServer: Endpoint GET /api/auth/perfil autenticado validado.");
 
-            // 8.4. POST /api/servicos/calcular (Cálculo em tempo real)
-            String payloadCalculo = "{\"tipo\": \"METRO_QUADRADO\", \"area\": 80, \"valorMetroQuadrado\": 60, \"imposto\": 0.06}";
+            // 8.4. POST /api/servicos/calcular (Cálculo em tempo real com Simples Nacional)
+            String payloadCalculo = "{\"tipo\": \"METRO_QUADRADO\", \"area\": 80, \"valorMetroQuadrado\": 60, \"rbt12\": 300000.0}";
             HttpResponse<String> calculoResp = client.send(
                 HttpRequest.newBuilder()
                     .uri(URI.create("http://localhost:" + TEST_PORT + "/api/servicos/calcular"))
@@ -227,8 +310,10 @@ public class WebIntegrationTest {
                 HttpResponse.BodyHandlers.ofString()
             );
             assert calculoResp.statusCode() == 200 : "API calcular status deveria ser 200";
-            assert calculoResp.body().contains("5088.00") : "Valor final com imposto deveria ser 5088.00";
-            System.out.println("[OK] NexumServer: Endpoint POST /api/servicos/calcular validado.");
+            assert calculoResp.body().contains("\"faixaSimples\": 2") : "Deveria retornar faixa 2 do Simples";
+            assert calculoResp.body().contains("0.0808") : "Alíquota efetiva calculada deve ser 8.08%";
+            assert calculoResp.body().contains("5187.84") : "Valor final com imposto efetivo deveria ser 5187.84";
+            System.out.println("[OK] NexumServer: Endpoint POST /api/servicos/calcular com Simples Nacional validado.");
 
             // 8.5. DELETE /api/cobrancas/{id}
             Cobranca cobrancaParaExcluir = cobrancaService.gerarCobrancaParaOrcamento(orcamento.getId(), java.time.LocalDate.now().plusDays(15).toString());

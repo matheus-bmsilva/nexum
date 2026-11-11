@@ -138,9 +138,7 @@ public class UsuarioService {
         usuario.setWhatsApp(ClienteService.sanitizarTelefone(whatsApp));
 
         if (novaSenhaOpcional != null && !novaSenhaOpcional.isBlank()) {
-            if (novaSenhaOpcional.length() < 6) {
-                throw new ValidationException("A nova senha deve possuir ao menos 6 caracteres.");
-            }
+            validarComplexidadeSenha(novaSenhaOpcional);
             usuario.setSenha(PasswordSecurity.hashPassword(novaSenhaOpcional));
         }
 
@@ -151,6 +149,39 @@ public class UsuarioService {
     public void deletar(int id) {
         buscarPorId(id);
         usuarioRepository.deletar(id);
+    }
+
+    /**
+     * Valida a política rigorosa de complexidade de senha:
+     * - Mínimo de 12 caracteres;
+     * - Pelo menos uma letra maiúscula;
+     * - Pelo menos um caractere especial.
+     */
+    public static void validarComplexidadeSenha(String senha) {
+        if (senha == null || senha.isBlank()) {
+            throw new ValidationException("A senha de acesso é obrigatória.");
+        }
+        if (senha.length() < 12) {
+            throw new ValidationException("A senha deve conter no mínimo 12 caracteres.");
+        }
+
+        boolean temMaiuscula = false;
+        boolean temEspecial = false;
+
+        for (char c : senha.toCharArray()) {
+            if (Character.isUpperCase(c)) {
+                temMaiuscula = true;
+            } else if (!Character.isLetterOrDigit(c)) {
+                temEspecial = true;
+            }
+        }
+
+        if (!temMaiuscula) {
+            throw new ValidationException("A senha deve conter pelo menos uma letra maiúscula.");
+        }
+        if (!temEspecial) {
+            throw new ValidationException("A senha deve conter pelo menos um caractere especial (ex: @, #, $, %, &, *).");
+        }
     }
 
     private void validarCampos(String nome, String email, String whatsApp, String cnpj, String senha, boolean validarSenha) {
@@ -179,12 +210,7 @@ public class UsuarioService {
             throw new ValidationException("O telefone/WhatsApp informado é inválido.");
         }
         if (validarSenha) {
-            if (senha == null || senha.isBlank()) {
-                throw new ValidationException("A senha de acesso é obrigatória.");
-            }
-            if (senha.length() < 6) {
-                throw new ValidationException("A senha deve conter ao menos 6 caracteres.");
-            }
+            validarComplexidadeSenha(senha);
         }
     }
 }

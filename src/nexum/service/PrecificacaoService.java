@@ -24,41 +24,88 @@ public class PrecificacaoService {
 
     private final ServicoRepository servicoRepository;
     private final ClienteService clienteService;
+    private final SimplesNacionalService simplesNacionalService;
 
     public PrecificacaoService() {
-        this(new SqliteServicoRepository(), new ClienteService());
+        this(new SqliteServicoRepository(), new ClienteService(), new SimplesNacionalService());
     }
 
     public PrecificacaoService(ServicoRepository servicoRepository, ClienteService clienteService) {
+        this(servicoRepository, clienteService, new SimplesNacionalService());
+    }
+
+    public PrecificacaoService(ServicoRepository servicoRepository, ClienteService clienteService, SimplesNacionalService simplesNacionalService) {
         this.servicoRepository = servicoRepository;
         this.clienteService = clienteService;
+        this.simplesNacionalService = simplesNacionalService;
     }
 
     /**
-     * DTO imutável com a memória de cálculo completa de um serviço arquitetônico.
+     * DTO imutável com a memória de cálculo completa de um serviço arquitetônico,
+     * incluindo impacto tributário real do Simples Nacional (Anexo III).
      */
     public record MemoriaCalculo(
         String tipoServico,
         double valorBase,
         double aliquotaImposto,
         double valorImposto,
-        double valorTotalFinal
-    ) {}
+        double valorTotalFinal,
+        int faixaSimples,
+        double rbt12,
+        double parcelaADeduzir,
+        String descricaoFaixa
+    ) {
+        public MemoriaCalculo(String tipoServico, double valorBase, double aliquotaImposto, double valorImposto, double valorTotalFinal) {
+            this(tipoServico, valorBase, aliquotaImposto, valorImposto, valorTotalFinal, 1, 0.0, 0.0, "1ª Faixa: Até R$ 180.000,00");
+        }
+    }
 
-    public MemoriaCalculo calcularMemoria(Servico servico) {
+    public MemoriaCalculo calcularMemoria(Servico servico, double rbt12) {
         if (servico == null) {
             throw new ValidationException("Serviço não informado para cálculo.");
         }
         double base = servico.calcularValor();
-        double imposto = base * servico.getImposto();
+        double aliquota;
+        int faixa = 1;
+        double pd = 0.0;
+        String desc = "1ª Faixa: Até R$ 180.000,00";
+
+        if (rbt12 > 0) {
+            SimplesNacionalService.ResultadoSimples res = simplesNacionalService.calcular(rbt12);
+            aliquota = res.aliquotaEfetiva();
+            faixa = res.faixa();
+            pd = res.parcelaADeduzir();
+            desc = res.descricaoFaixa();
+        } else {
+            aliquota = (servico.getImposto() > 0) ? servico.getImposto() : IMPOSTO_PADRAO_MEI;
+        }
+
+        double imposto = base * aliquota;
         double total = base + imposto;
         return new MemoriaCalculo(
             servico.getClass().getSimpleName(),
             round(base),
-            round(servico.getImposto()),
+            round(aliquota),
             round(imposto),
-            round(total)
+            round(total),
+            faixa,
+            rbt12,
+            pd,
+            desc
         );
+    }
+
+    public MemoriaCalculo calcularMemoria(Servico servico) {
+        return calcularMemoria(servico, 0.0);
+    }
+
+    public SimplesNacionalService getSimplesNacionalService() {
+        return simplesNacionalService;
+    }
+
+    public double calcularAliquotaSimples(double rbt12) {
+        if (rbt12 <= 0) return IMPOSTO_PADRAO_MEI;
+        return simplesNacionalService.calcular(rbt12).aliquotaEfetiva();
     }
 
     public ServicoPorMetroQuadrado criarServicoMetroQuadrado(

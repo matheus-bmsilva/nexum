@@ -80,6 +80,7 @@ public class PrecificacaoController implements HttpHandler {
         Map<String, String> data = JsonHelper.parseSimpleJson(body);
 
         String tipo = data.getOrDefault("tipo", ServicoFactory.TIPO_METRO_QUADRADO);
+        double rbt12 = parseDouble(data.get("rbt12"), 0.0);
         double imposto = parseDouble(data.get("imposto"), PrecificacaoService.IMPOSTO_PADRAO_MEI);
 
         Servico servicoTransient = switch (tipo) {
@@ -105,7 +106,7 @@ public class PrecificacaoController implements HttpHandler {
             default -> throw new ValidationException("Tipo de serviço inválido para cálculo: " + tipo);
         };
 
-        PrecificacaoService.MemoriaCalculo memoria = precificacaoService.calcularMemoria(servicoTransient);
+        PrecificacaoService.MemoriaCalculo memoria = precificacaoService.calcularMemoria(servicoTransient, rbt12);
         HttpHelper.sendJson(exchange, 200, JsonHelper.memoriaToJson(memoria));
     }
 
@@ -124,7 +125,13 @@ public class PrecificacaoController implements HttpHandler {
         } catch (Exception e) {
             padrao = Padrao.MEDIO;
         }
-        double imposto = parseDouble(data.get("imposto"), PrecificacaoService.IMPOSTO_PADRAO_MEI);
+        double rbt12 = parseDouble(data.get("rbt12"), 0.0);
+        double imposto = parseDouble(data.get("imposto"), 0.0);
+        if (rbt12 > 0) {
+            imposto = precificacaoService.calcularAliquotaSimples(rbt12);
+        } else if (imposto <= 0) {
+            imposto = PrecificacaoService.IMPOSTO_PADRAO_MEI;
+        }
 
         Servico salvo = switch (tipo) {
             case ServicoFactory.TIPO_METRO_QUADRADO -> {

@@ -135,6 +135,12 @@
                 </div>
               </div>
 
+              <div class="form-group">
+                <label for="servico-rbt12">Receita Bruta Acumulada 12 Meses (RBT12) *</label>
+                <input type="number" id="servico-rbt12" placeholder="Ex: 180000" value="180000" step="any" min="0">
+                <small class="form-help">Calcula a alíquota efetiva do Simples Nacional (Anexo III - Arquitetura e Urbanismo).</small>
+              </div>
+
               <!-- Seletor de Modalidade Polimórfica Sóbrio -->
               <div class="form-group">
                 <label>Modalidade de Cobrança</label>
@@ -164,11 +170,11 @@
                 <div class="grid-2-inputs">
                   <div class="form-group">
                     <label for="m2-area">Área Construída (m²) *</label>
-                    <input type="number" id="m2-area" placeholder="Ex: 120" step="0.5" min="1">
+                    <input type="number" id="m2-area" placeholder="Ex: 120" step="any" min="0">
                   </div>
                   <div class="form-group">
                     <label for="m2-valor">Valor por m² (R$) *</label>
-                    <input type="number" id="m2-valor" placeholder="Ex: 45.00" step="0.5" min="1">
+                    <input type="number" id="m2-valor" placeholder="Ex: 45.00" step="any" min="0">
                   </div>
                 </div>
               </div>
@@ -182,14 +188,15 @@
                 <div id="lista-etapas" class="etapas-lista">
                   <div class="etapa-item-row">
                     <select class="etapa-tipo">
+                      <option value="" selected disabled>Selecione uma etapa</option>
                       <option value="LEVANTAMENTO">1. Levantamento Cadastral</option>
                       <option value="ESTUDO_PRELIMINAR">2. Estudo Preliminar</option>
                       <option value="ANTEPROJETO">3. Anteprojeto</option>
                       <option value="PROJETO_LEGAL">4. Projeto Legal / Prefeitura</option>
-                      <option value="PROJETO_EXECUTIVO" selected>5. Projeto Executivo Detalhado</option>
+                      <option value="PROJETO_EXECUTIVO">5. Projeto Executivo Detalhado</option>
                       <option value="EXECUCAO_ACOMPANHAMENTO">6. Execução e Acompanhamento</option>
                     </select>
-                    <input type="number" class="etapa-valor" placeholder="Valor (R$)" step="50" min="0" value="3500">
+                    <input type="number" class="etapa-valor" placeholder="Valor (R$)" step="any" min="0">
                     <button type="button" class="btn-remove-etapa" title="Remover etapa">&times;</button>
                   </div>
                 </div>
@@ -200,11 +207,11 @@
                 <div class="grid-2-inputs">
                   <div class="form-group">
                     <label for="hora-horas">Horas Estimadas *</label>
-                    <input type="number" id="hora-horas" placeholder="Ex: 25" step="1" min="1">
+                    <input type="number" id="hora-horas" placeholder="Ex: 25" step="any" min="0">
                   </div>
                   <div class="form-group">
                     <label for="hora-valor">Valor da Hora Técnica (R$) *</label>
-                    <input type="number" id="hora-valor" placeholder="Ex: 150.00" step="5" min="1">
+                    <input type="number" id="hora-valor" placeholder="Ex: 150.00" step="any" min="0">
                   </div>
                 </div>
               </div>
@@ -214,11 +221,11 @@
                 <div class="grid-2-inputs">
                   <div class="form-group">
                     <label for="perc-custo">Custo Total Previsto da Obra (R$) *</label>
-                    <input type="number" id="perc-custo" placeholder="Ex: 400000" step="1000" min="1">
+                    <input type="number" id="perc-custo" placeholder="Ex: 400000" step="any" min="0">
                   </div>
                   <div class="form-group">
                     <label for="perc-taxa">Taxa de Honorários (%) *</label>
-                    <input type="number" id="perc-taxa" placeholder="Ex: 5 para 5%" step="0.1" min="0.1" max="100">
+                    <input type="number" id="perc-taxa" placeholder="Ex: 5 para 5%" step="any" min="0" max="100">
                   </div>
                 </div>
               </div>
@@ -233,7 +240,7 @@
           <div class="card card-accent">
             <div class="card-header">
               <h2>Memória de Cálculo</h2>
-              <p>Demonstrativo técnico e provisão tributária estimada (Simples/MEI 6%).</p>
+              <p>Demonstrativo técnico e impacto tributário real (Simples Nacional - Anexo III).</p>
             </div>
 
             <div class="memoria-box">
@@ -246,7 +253,15 @@
                 <strong id="memoria-base">R$ 0,00</strong>
               </div>
               <div class="memoria-row">
-                <span>Provisão Tributária (6% DAS-MEI)</span>
+                <span>Faixa Simples Nacional</span>
+                <strong id="memoria-faixa">1ª Faixa: Até R$ 180.000,00</strong>
+              </div>
+              <div class="memoria-row">
+                <span>Alíquota Efetiva Calculada</span>
+                <strong id="memoria-aliquota">6,00%</strong>
+              </div>
+              <div class="memoria-row">
+                <span>Provisão Tributária (Simples Nacional)</span>
                 <strong id="memoria-imposto">R$ 0,00</strong>
               </div>
               <hr class="divider">
@@ -282,7 +297,7 @@
                   </tr>
                 </thead>
                 <tbody id="tabela-clientes-corpo">
-                  <tr><td colspan="4" class="text-center">Carregando clientes...</td></tr>
+                  <tr><td colspan="4" class="text-center text-muted">Não há clientes cadastrados.</td></tr>
                 </tbody>
               </table>
             </div>

@@ -40,7 +40,9 @@ public class SqliteUsuarioRepository implements UsuarioRepository {
             }
             return usuario;
         } catch (SQLException e) {
-            if (e.getMessage() != null && e.getMessage().contains("UNIQUE")) {
+            String msg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
+            String state = e.getSQLState() != null ? e.getSQLState() : "";
+            if ("23505".equals(state) || msg.contains("unique") || msg.contains("duplicate key")) {
                 throw new ValidationException("Violação de unicidade: CNPJ ou e-mail já cadastrado.", e);
             }
             throw new DatabaseException("Erro ao salvar usuário no banco de dados.", e);
@@ -139,7 +141,9 @@ public class SqliteUsuarioRepository implements UsuarioRepository {
 
             stmt.executeUpdate();
         } catch (SQLException e) {
-            if (e.getMessage() != null && e.getMessage().contains("UNIQUE")) {
+            String msg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
+            String state = e.getSQLState() != null ? e.getSQLState() : "";
+            if ("23505".equals(state) || msg.contains("unique") || msg.contains("duplicate key")) {
                 throw new ValidationException("Violação de unicidade ao atualizar dados: documento ou e-mail já em uso.", e);
             }
             throw new DatabaseException("Erro ao atualizar dados do usuário.", e);
