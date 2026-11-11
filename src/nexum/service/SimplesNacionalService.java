@@ -89,4 +89,50 @@ public class SimplesNacionalService {
             faixaSelecionada.descricao()
         );
     }
+
+    /**
+     * Calcula diretamente a alíquota efetiva aplicável para o RBT12 informado.
+     */
+    public double calcularAliquotaEfetiva(double rbt12) {
+        return calcular(rbt12).aliquotaEfetiva();
+    }
+
+    /**
+     * Calcula o montante monetário exato do tributo incidente sobre os honorários brutos do arquiteto.
+     */
+    public double calcularValorImposto(double valorBase, double rbt12) {
+        if (valorBase < 0) {
+            throw new ValidationException("O valor base de honorários não pode ser negativo.");
+        }
+        return valorBase * calcularAliquotaEfetiva(rbt12);
+    }
+
+    /**
+     * Calcula o valor total da proposta (honorários líquidos + tributação Simples Nacional).
+     */
+    public double calcularValorTotal(double valorBase, double rbt12) {
+        return valorBase + calcularValorImposto(valorBase, rbt12);
+    }
+
+    /**
+     * Retorna a faixa do Simples Nacional correspondente ao faturamento acumulado.
+     */
+    public FaixaSimples identificarFaixa(double rbt12) {
+        if (rbt12 <= LIMITE_PRIMEIRA_FAIXA) {
+            return FAIXAS[0];
+        }
+        for (FaixaSimples faixa : FAIXAS) {
+            if (rbt12 <= faixa.limiteSuperior()) {
+                return faixa;
+            }
+        }
+        return FAIXAS[FAIXAS.length - 1];
+    }
+
+    /**
+     * Retorna cópia imutável da tabela de faixas do Anexo III.
+     */
+    public static FaixaSimples[] getFaixas() {
+        return FAIXAS.clone();
+    }
 }

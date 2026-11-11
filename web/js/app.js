@@ -43,10 +43,13 @@ async function authFetch(url, options = {}) {
 document.addEventListener('DOMContentLoaded', () => {
   // Inicialização de componentes e eventos
   initAuth();
+  configurarVisoresSenha();
+  configurarFechamentoGlobalModais();
   initTabs();
   initModalidadeSelector();
   initEtapasManager();
   initCalculoSimulacao();
+  configurarCamposMoeda();
   initFormServico();
   initClientes();
   initOrcamentos();
@@ -238,6 +241,55 @@ function initAuth() {
   }
 }
 
+/**
+ * Configura botões de alternância da visibilidade da senha (olho/visor)
+ */
+function configurarVisoresSenha() {
+  const botoesVisor = document.querySelectorAll('.btn-toggle-senha');
+  botoesVisor.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const wrapper = btn.closest('.password-wrapper');
+      if (!wrapper) return;
+      const input = wrapper.querySelector('input');
+      if (!input) return;
+
+      const iconOpen = btn.querySelector('.eye-icon-open');
+      const iconClosed = btn.querySelector('.eye-icon-closed');
+
+      if (input.type === 'password') {
+        input.type = 'text';
+        if (iconOpen) iconOpen.classList.add('hidden');
+        if (iconClosed) iconClosed.classList.remove('hidden');
+      } else {
+        input.type = 'password';
+        if (iconOpen) iconOpen.classList.remove('hidden');
+        if (iconClosed) iconClosed.classList.add('hidden');
+      }
+      input.focus();
+    });
+  });
+}
+
+/**
+ * Adiciona listeners globais para fechamento de modais com clique fora ou tecla Esc.
+ */
+function configurarFechamentoGlobalModais() {
+  document.addEventListener('click', (e) => {
+    if (e.target && e.target.classList && e.target.classList.contains('modal')) {
+      e.target.classList.add('hidden');
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.modal:not(.hidden)').forEach(modal => {
+        modal.classList.add('hidden');
+      });
+    }
+  });
+}
+
 async function verificarAutenticacao() {
   const token = getToken();
   if (!token) {
@@ -369,7 +421,7 @@ function initEtapasManager() {
     row.className = 'etapa-item-row';
     row.innerHTML = `
       <select class="etapa-tipo">
-        <option value="" selected disabled>Selecione uma etapa</option>
+        <option value="" selected>Selecione uma opção</option>
         <option value="LEVANTAMENTO">1. Levantamento Cadastral</option>
         <option value="ESTUDO_PRELIMINAR">2. Estudo Preliminar</option>
         <option value="ANTEPROJETO">3. Anteprojeto</option>
@@ -377,16 +429,19 @@ function initEtapasManager() {
         <option value="PROJETO_EXECUTIVO">5. Projeto Executivo Detalhado</option>
         <option value="EXECUCAO_ACOMPANHAMENTO">6. Execução e Acompanhamento</option>
       </select>
-      <input type="number" class="etapa-valor" placeholder="Valor (R$)" step="any" min="0">
+      <input type="text" class="etapa-valor input-moeda" placeholder="R$ 0,00" inputmode="decimal">
       <button type="button" class="btn-remove-etapa" title="Remover etapa">&times;</button>
     `;
     lista.appendChild(row);
+    const novoInput = row.querySelector('.etapa-valor');
+    aplicarMascaraMoeda(novoInput);
+
     row.querySelector('.btn-remove-etapa').addEventListener('click', () => {
       row.remove();
       simularCalculo();
     });
     row.querySelector('.etapa-tipo').addEventListener('change', simularCalculo);
-    row.querySelector('.etapa-valor').addEventListener('input', simularCalculo);
+    novoInput.addEventListener('input', simularCalculo);
   });
 
   lista.querySelectorAll('.btn-remove-etapa').forEach(btn => {
@@ -399,6 +454,7 @@ function initEtapasManager() {
     select.addEventListener('change', simularCalculo);
   });
   lista.querySelectorAll('.etapa-valor').forEach(input => {
+    aplicarMascaraMoeda(input);
     input.addEventListener('input', simularCalculo);
   });
 }
@@ -421,30 +477,30 @@ function coletarDadosModalidade() {
   const radioChecked = document.querySelector('input[name="modalidade"]:checked');
   const modalidade = radioChecked ? radioChecked.value : 'METRO_QUADRADO';
   const rbt12Input = document.getElementById('servico-rbt12');
-  const rbt12 = rbt12Input ? (parseFloat(rbt12Input.value) || 0) : 0;
+  const rbt12 = rbt12Input ? parseNumeroBRL(rbt12Input.value) : 0;
   const payload = { tipo: modalidade, rbt12: rbt12, imposto: 0.06 };
 
   if (modalidade === 'METRO_QUADRADO') {
-    payload.area = parseFloat(document.getElementById('m2-area').value) || 0;
-    payload.valorMetroQuadrado = parseFloat(document.getElementById('m2-valor').value) || 0;
+    payload.area = parseNumeroBRL(document.getElementById('m2-area').value);
+    payload.valorMetroQuadrado = parseNumeroBRL(document.getElementById('m2-valor').value);
   } else if (modalidade === 'ETAPA') {
     const rows = document.querySelectorAll('#lista-etapas .etapa-item-row');
     const itens = [];
     rows.forEach(r => {
       const select = r.querySelector('.etapa-tipo');
       const etapa = select ? select.value : '';
-      const valor = parseFloat(r.querySelector('.etapa-valor').value) || 0;
+      const valor = parseNumeroBRL(r.querySelector('.etapa-valor').value);
       if (etapa) {
         itens.push({ etapa, valor });
       }
     });
     payload.itensEtapas = itens;
   } else if (modalidade === 'HORA') {
-    payload.horasTrabalhadas = parseFloat(document.getElementById('hora-horas').value) || 0;
-    payload.valorHora = parseFloat(document.getElementById('hora-valor').value) || 0;
+    payload.horasTrabalhadas = parseNumeroBRL(document.getElementById('hora-horas').value);
+    payload.valorHora = parseNumeroBRL(document.getElementById('hora-valor').value);
   } else if (modalidade === 'PERCENTUAL_OBRA') {
-    payload.custoTotalObra = parseFloat(document.getElementById('perc-custo').value) || 0;
-    const taxaInput = parseFloat(document.getElementById('perc-taxa').value) || 0;
+    payload.custoTotalObra = parseNumeroBRL(document.getElementById('perc-custo').value);
+    const taxaInput = parseNumeroBRL(document.getElementById('perc-taxa').value);
     payload.percentual = taxaInput / 100.0;
   }
 
@@ -531,10 +587,37 @@ function initFormServico() {
 }
 
 /* ==========================================================================
-   8. GESTÃO DE CLIENTES
+   8. GESTÃO DE CLIENTES & MODAL DE CADASTRO
    ========================================================================== */
 function initClientes() {
   const form = document.getElementById('form-cliente');
+  const modalCliente = document.getElementById('modal-cliente');
+  const btnAbrirModal = document.getElementById('btn-abrir-modal-cliente');
+  const btnFecharModal = document.getElementById('btn-fechar-modal-cliente');
+  const btnCancelarModal = document.getElementById('btn-cancelar-modal-cliente');
+
+  const fecharModalCliente = () => {
+    if (modalCliente) modalCliente.classList.add('hidden');
+    if (form) form.reset();
+  };
+
+  if (btnAbrirModal && modalCliente) {
+    btnAbrirModal.addEventListener('click', () => {
+      if (form) form.reset();
+      modalCliente.classList.remove('hidden');
+      const inputNome = document.getElementById('cliente-nome');
+      if (inputNome) inputNome.focus();
+    });
+  }
+
+  if (btnFecharModal) {
+    btnFecharModal.addEventListener('click', fecharModalCliente);
+  }
+
+  if (btnCancelarModal) {
+    btnCancelarModal.addEventListener('click', fecharModalCliente);
+  }
+
   if (!form) return;
 
   form.addEventListener('submit', async (e) => {
@@ -560,7 +643,7 @@ function initClientes() {
       }
 
       showToast(`Cliente "${resData.nome}" cadastrado com sucesso!`);
-      form.reset();
+      fecharModalCliente();
       carregarClientes();
     } catch (err) {
       showToast('Falha ao conectar ao servidor: ' + err.message, 'error');
@@ -699,19 +782,46 @@ function initOrcamentos() {
   }
 }
 
+let cacheServicosOrcamento = [];
+
 async function carregarServicosParaOrcamento() {
   try {
     const resp = await authFetch('/api/servicos');
     if (!resp.ok) return;
     const servicos = await resp.json();
+    cacheServicosOrcamento = Array.isArray(servicos) ? servicos : [];
     const select = document.getElementById('orcamento-servico-select');
     if (select) {
       select.innerHTML = '<option value="">Selecione o serviço...</option>' +
-        servicos.map(s => `<option value="${s.id}">#${s.id} - ${escapeHtml(s.descricao)} (${formatarMoeda(s.valorTotal)})</option>`).join('');
+        cacheServicosOrcamento.map(s => `<option value="${s.id}">#${s.id} - ${escapeHtml(s.descricao)} (${formatarMoeda(s.valorTotal)})</option>`).join('');
+      
+      select.onchange = () => atualizarPreviewTributarioOrcamento(select.value);
     }
   } catch (err) {
     console.error('Erro ao carregar serviços:', err);
   }
+}
+
+function atualizarPreviewTributarioOrcamento(servicoId) {
+  const box = document.getElementById('orcamento-detalhes-tributarios');
+  if (!box) return;
+
+  const servico = cacheServicosOrcamento.find(s => String(s.id) === String(servicoId));
+  if (!servico) {
+    box.style.display = 'none';
+    return;
+  }
+
+  const base = servico.valorBase || 0;
+  const impostoAliq = servico.imposto || 0;
+  const total = servico.valorTotal || (base * (1 + impostoAliq));
+  const valorImposto = total - base;
+
+  document.getElementById('orcamento-prev-base').textContent = formatarMoeda(base);
+  document.getElementById('orcamento-prev-aliq').textContent = ((impostoAliq * 100).toFixed(2).replace('.', ',')) + '%';
+  document.getElementById('orcamento-prev-imposto').textContent = formatarMoeda(valorImposto);
+  document.getElementById('orcamento-prev-total').textContent = formatarMoeda(total);
+  box.style.display = 'block';
 }
 
 async function abrirModalOrcamentoComServico(servicoId, clienteId) {
@@ -720,6 +830,7 @@ async function abrirModalOrcamentoComServico(servicoId, clienteId) {
   if (modal) {
     document.getElementById('orcamento-cliente-select').value = clienteId;
     document.getElementById('orcamento-servico-select').value = servicoId;
+    atualizarPreviewTributarioOrcamento(servicoId);
     modal.classList.remove('hidden');
   }
 }
@@ -749,6 +860,8 @@ function renderTabelaOrcamentos(orcamentos) {
     const clienteNome = o.cliente ? o.cliente.nome : 'N/A';
     const servicoDesc = o.servico ? o.servico.descricao : 'N/A';
     const statusBadge = getStatusBadge(o.statusOrcamento);
+    const servico = o.servico;
+    const temImposto = servico && (servico.imposto !== undefined || servico.valorBase !== undefined);
 
     return `
       <tr>
@@ -757,7 +870,15 @@ function renderTabelaOrcamentos(orcamentos) {
         <td>${escapeHtml(servicoDesc)}</td>
         <td>${escapeHtml(o.dataEmissao)}</td>
         <td>${o.validade} dias</td>
-        <td><strong>${formatarMoeda(o.valorTotal)}</strong></td>
+        <td>
+          <strong>${formatarMoeda(o.valorTotal)}</strong>
+          ${temImposto ? `
+            <div class="text-muted" style="font-size: 0.75rem; margin-top: 3px; line-height: 1.2;">
+              <span>Líq: ${formatarMoeda(servico.valorBase || 0)}</span><br>
+              <span>Simples (${((servico.imposto || 0) * 100).toFixed(2).replace('.', ',')}%) : ${formatarMoeda((servico.valorTotal - (servico.valorBase || 0)))}</span>
+            </div>
+          ` : ''}
+        </td>
         <td>${statusBadge}</td>
         <td>
           <button class="btn btn-whatsapp btn-sm" onclick="abrirWhatsAppOrcamento(${o.id})">
@@ -1001,14 +1122,73 @@ async function deletarCobranca(id) {
 }
 
 /* ==========================================================================
-   11. UTILITÁRIOS GERAIS
+   11. UTILITÁRIOS GERAIS & MÁSCARAS BRL
    ========================================================================== */
+function parseNumeroBRL(val) {
+  if (val === null || val === undefined) return 0;
+  if (typeof val === 'number') return isNaN(val) ? 0 : val;
+  let str = String(val).trim().replace(/^R\$\s?/, '').trim();
+  if (!str) return 0;
+
+  // Trata formato brasileiro com pontos de milhar e vírgula decimal (ex: 2.500.000,00)
+  if (str.includes('.') && str.includes(',')) {
+    str = str.replace(/\./g, '').replace(',', '.');
+  } else if (str.includes(',')) {
+    // Apenas vírgula decimal (ex: 150,50 ou 12,5)
+    str = str.replace(',', '.');
+  } else if (str.includes('.')) {
+    // Pode ser decimal (150.50) ou padrão de milhar (2.500.000)
+    const partes = str.split('.');
+    if (partes.length > 2) {
+      str = str.replace(/\./g, '');
+    }
+  }
+
+  const num = parseFloat(str);
+  return isNaN(num) ? 0 : num;
+}
+
 function formatarMoeda(val) {
-  const num = typeof val === 'number' ? val : (parseFloat(val) || 0);
+  const num = parseNumeroBRL(val);
   const partes = Math.abs(num).toFixed(2).split('.');
   const inteiraComPontos = partes[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   const prefixo = num < 0 ? '-R$ ' : 'R$ ';
   return `${prefixo}${inteiraComPontos},${partes[1]}`;
+}
+
+function configurarCamposMoeda() {
+  document.querySelectorAll('.input-moeda').forEach(aplicarMascaraMoeda);
+}
+
+function aplicarMascaraMoeda(input) {
+  if (!input || input.dataset.mascaraAplicada) return;
+  input.dataset.mascaraAplicada = 'true';
+
+  // Se já possuir valor numérico inicial, formata para BRL
+  if (input.value && !input.value.startsWith('R$')) {
+    const n = parseNumeroBRL(input.value);
+    if (n > 0) input.value = formatarMoeda(n);
+  }
+
+  input.addEventListener('focus', () => {
+    const num = parseNumeroBRL(input.value);
+    if (num > 0) {
+      input.value = num.toFixed(2).replace('.', ',');
+      input.select();
+    } else {
+      input.value = '';
+    }
+  });
+
+  input.addEventListener('blur', () => {
+    const num = parseNumeroBRL(input.value);
+    if (num > 0) {
+      input.value = formatarMoeda(num);
+    } else {
+      input.value = '';
+    }
+    simularCalculo();
+  });
 }
 
 function escapeHtml(str) {

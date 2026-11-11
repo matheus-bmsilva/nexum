@@ -85,7 +85,7 @@ public class PrecificacaoService {
         return new MemoriaCalculo(
             servico.getClass().getSimpleName(),
             round(base),
-            round(aliquota),
+            roundAliquota(aliquota),
             round(imposto),
             round(total),
             faixa,
@@ -210,5 +210,9 @@ public class PrecificacaoService {
 
     private static double round(double val) {
         return Math.round(val * 100.0) / 100.0;
+    }
+
+    private static double roundAliquota(double val) {
+        return Math.round(val * 10000.0) / 10000.0;
     }
 }

@@ -162,7 +162,13 @@ public class PrecificacaoController implements HttpHandler {
     private static double parseDouble(String str, double def) {
         if (str == null || str.isBlank()) return def;
         try {
-            return Double.parseDouble(str.trim());
+            String sanitized = str.trim().replaceAll("R\\$\\s?", "").trim();
+            if (sanitized.contains(".") && sanitized.contains(",")) {
+                sanitized = sanitized.replace(".", "").replace(",", ".");
+            } else if (sanitized.contains(",")) {
+                sanitized = sanitized.replace(",", ".");
+            }
+            return Double.parseDouble(sanitized);
         } catch (NumberFormatException e) {
             return def;
         }
