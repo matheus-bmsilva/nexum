@@ -138,6 +138,96 @@ public class SqliteClienteRepository implements ClienteRepository {
         }
     }
 
+    @Override
+    public boolean possuiVinculos(int clienteId) {
+        String sql = """
+            SELECT (
+                (SELECT COUNT(1) FROM servicos WHERE cliente_id = ?) +
+                (SELECT COUNT(1) FROM orcamentos WHERE cliente_id = ?)
+            ) AS total_vinculos
+        """;
+        try (Connection conn = ConnectionFactory.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setInt(1, clienteId);
+            stmt.setInt(2, clienteId);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0;
+                }
+            }
+            return false;
+        } catch (SQLException e) {
+            throw new DatabaseException("Erro ao verificar vínculos do cliente.", e);
+        }
+    }
+
+    @Override
+    public void deletarEmCascata(int clienteId) {
+        String sqlDelCobrancas = """
+            DELETE FROM cobrancas
+            WHERE orcamento_id IN (
+                SELECT id FROM orcamentos
+                WHERE cliente_id = ? OR servico_id IN (SELECT id FROM servicos WHERE cliente_id = ?)
+            )
+        """;
+        String sqlDelOrcamentos = """
+            DELETE FROM orcamentos
+            WHERE cliente_id = ? OR servico_id IN (SELECT id FROM servicos WHERE cliente_id = ?)
+        """;
+        String sqlDelItensEtapa = """
+            DELETE FROM itens_etapa
+            WHERE servico_id IN (SELECT id FROM servicos WHERE cliente_id = ?)
+        """;
+        String sqlDelServicos = "DELETE FROM servicos WHERE cliente_id = ?";
+        String sqlDelCliente = "DELETE FROM clientes WHERE id = ?";
+
+        try (Connection conn = ConnectionFactory.getConnection()) {
+            boolean autoCommitOriginal = conn.getAutoCommit();
+            conn.setAutoCommit(false);
+            try {
+                try (PreparedStatement stmtCob = conn.prepareStatement(sqlDelCobrancas)) {
+                    stmtCob.setInt(1, clienteId);
+                    stmtCob.setInt(2, clienteId);
+                    stmtCob.executeUpdate();
+                }
+                try (PreparedStatement stmtOrc = conn.prepareStatement(sqlDelOrcamentos)) {
+                    stmtOrc.setInt(1, clienteId);
+                    stmtOrc.setInt(2, clienteId);
+                    stmtOrc.executeUpdate();
+                }
+                try (PreparedStatement stmtItens = conn.prepareStatement(sqlDelItensEtapa)) {
+                    stmtItens.setInt(1, clienteId);
+                    stmtItens.executeUpdate();
+                }
+                try (PreparedStatement stmtServ = conn.prepareStatement(sqlDelServicos)) {
+                    stmtServ.setInt(1, clienteId);
+                    stmtServ.executeUpdate();
+                }
+                try (PreparedStatement stmtCli = conn.prepareStatement(sqlDelCliente)) {
+                    stmtCli.setInt(1, clienteId);
+                    stmtCli.executeUpdate();
+                }
+                conn.commit();
+            } catch (SQLException e) {
+                try {
+                    conn.rollback();
+                } catch (SQLException rollbackEx) {
+                    e.addSuppressed(rollbackEx);
+                }
+                throw e;
+            } finally {
+                try {
+                    conn.setAutoCommit(autoCommitOriginal);
+                } catch (SQLException ignored) {
+                }
+            }
+        } catch (SQLException e) {
+            throw new DatabaseException("Erro ao remover cliente e registros vinculados em cascata.", e);
+        }
+    }
+
     private Cliente mapearCliente(ResultSet rs) throws SQLException {
         return new Cliente(
             rs.getInt("id"),

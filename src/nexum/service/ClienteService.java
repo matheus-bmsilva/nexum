@@ -16,6 +16,10 @@ import nexum.validation.DocumentoValidator;
  */
 public class ClienteService {
 
+    public static final String MENSAGEM_AVISO_VINCULOS =
+        "Atenção: Este cliente possui serviços, propostas comerciais ou cobranças vinculadas. " +
+        "Se você confirmar a exclusão, todos esses registros relacionados também serão permanentemente excluídos.";
+
     private final ClienteRepository clienteRepository;
 
     public ClienteService() {
@@ -83,9 +87,25 @@ public class ClienteService {
         return clienteRepository.listarTodos();
     }
 
+    public boolean possuiVinculos(int id) {
+        buscarPorId(id);
+        return clienteRepository.possuiVinculos(id);
+    }
+
     public void deletar(int id) {
+        deletar(id, false);
+    }
+
+    public void deletar(int id, boolean forcar) {
         buscarPorId(id); // Garante que existe antes de deletar
-        clienteRepository.deletar(id);
+        if (clienteRepository.possuiVinculos(id)) {
+            if (!forcar) {
+                throw new ValidationException(MENSAGEM_AVISO_VINCULOS);
+            }
+            clienteRepository.deletarEmCascata(id);
+        } else {
+            clienteRepository.deletar(id);
+        }
     }
 
     private void validarCampos(String nome, String cpf, String whatsApp) {

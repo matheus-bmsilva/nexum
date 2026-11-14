@@ -758,14 +758,42 @@ async function deletarCliente(id) {
     const resp = await authFetch(`/api/clientes/${id}`, { method: 'DELETE' });
     if (resp.ok) {
       showToast('Cliente removido com sucesso.');
-      carregarClientes();
+      await sincronizarDadosAposExclusaoCliente();
+      return;
+    }
+
+    const errData = await resp.json().catch(() => ({}));
+    if (resp.status === 409 || errData.possuiVinculos) {
+      const msgAviso = errData.erro || errData.error ||
+        'Atenção: Este cliente possui serviços, propostas comerciais ou cobranças vinculadas. Se você confirmar a exclusão, todos esses registros relacionados também serão permanentemente excluídos.';
+      if (!confirm(`${msgAviso}\n\nDeseja confirmar a exclusão permanente deste cliente e de todo o seu histórico?`)) {
+        return;
+      }
+
+      const respForcada = await authFetch(`/api/clientes/${id}?forcar=true`, { method: 'DELETE' });
+      if (respForcada.ok) {
+        showToast('Cliente e todo o seu histórico vinculado foram removidos com sucesso.');
+        await sincronizarDadosAposExclusaoCliente();
+      } else {
+        const errForcado = await respForcada.json().catch(() => ({}));
+        showToast(errForcado.error || errForcado.erro || 'Erro ao remover cliente e vínculos.', 'error');
+      }
     } else {
-      const err = await resp.json();
-      showToast(err.error || 'Erro ao remover cliente.', 'error');
+      showToast(errData.error || errData.erro || 'Erro ao remover cliente.', 'error');
     }
   } catch (e) {
     showToast('Falha na operação: ' + e.message, 'error');
   }
+}
+
+async function sincronizarDadosAposExclusaoCliente() {
+  await Promise.all([
+    carregarClientes(),
+    carregarOrcamentos(),
+    carregarCobrancas(),
+    carregarExtrato(),
+    carregarServicosParaOrcamento()
+  ]);
 }
 
 /* ==========================================================================

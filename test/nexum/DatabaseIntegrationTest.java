@@ -172,7 +172,16 @@ public class DatabaseIntegrationTest {
         assert "2026-11-20".equals(cobrancaPaga.getDataPagamento()) : "Data de pagamento incorreta";
         System.out.println("[OK] CobrancaRepository: Salvar, gerar mensagem e registrar liquidação validados.");
 
-        // 7. Limpeza do ambiente de teste
+        // 7. Teste de verificação de vínculos e exclusão em cascata transacional de Cliente
+        assert clienteRepo.possuiVinculos(clienteAtualizado.getId()) : "Cliente com serviços/orçamentos/cobranças deve acusar vínculo";
+        clienteRepo.deletarEmCascata(clienteAtualizado.getId());
+        assert clienteRepo.buscarPorId(clienteAtualizado.getId()).isEmpty() : "Cliente deveria ter sido removido na exclusão em cascata";
+        assert servicoRepo.listarPorCliente(clienteAtualizado.getId()).isEmpty() : "Serviços do cliente deveriam ter sido removidos em cascata";
+        assert orcamentoRepo.listarPorCliente(clienteAtualizado.getId()).isEmpty() : "Orçamentos do cliente deveriam ter sido removidos em cascata";
+        assert cobrancaRepo.buscarPorId(cobranca.getId()).isEmpty() : "Cobranças do cliente deveriam ter sido removidas em cascata";
+        System.out.println("[OK] ClienteRepository: Verificação de vínculos e exclusão em cascata transacional validadas.");
+
+        // 8. Limpeza do ambiente de teste
         ConnectionFactory.setDbPath("database/nexum.db"); // restaura caminho padrão
         testDb.delete();
         System.out.println("==================================================");

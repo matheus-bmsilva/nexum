@@ -21,4 +21,8 @@ public interface ClienteRepository {
     void atualizar(Cliente cliente);
 
     void deletar(int id);
+
+    boolean possuiVinculos(int clienteId);
+
+    void deletarEmCascata(int clienteId);
 }

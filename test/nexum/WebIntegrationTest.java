@@ -371,6 +371,32 @@ public class WebIntegrationTest {
             assert cobRecusadaResp.statusCode() == 400 : "POST /api/cobrancas para proposta recusada deveria retornar HTTP 400";
             System.out.println("[OK] NexumServer: Bloqueio HTTP 400 ao tentar cobrar proposta recusada validado.");
 
+            // 8.7. Fluxo de exclusão de cliente com vínculos em duas etapas (HTTP 409 sem forcar=true, HTTP 200 com forcar=true)
+            HttpResponse<String> delClienteSemForcarResp = client.send(
+                HttpRequest.newBuilder()
+                    .uri(URI.create("http://localhost:" + TEST_PORT + "/api/clientes/" + cliente.getId()))
+                    .DELETE()
+                    .build(),
+                HttpResponse.BodyHandlers.ofString()
+            );
+            assert delClienteSemForcarResp.statusCode() == 409 : "DELETE /api/clientes/{id} com vínculos e sem forcar=true deve retornar HTTP 409";
+            assert delClienteSemForcarResp.body().contains("\"possuiVinculos\": true") : "Resposta 409 deve conter possuiVinculos: true";
+            assert clienteService.buscarPorId(cliente.getId()) != null : "Cliente não deve ser excluído na primeira tentativa sem confirmação";
+
+            HttpResponse<String> delClienteForcadoResp = client.send(
+                HttpRequest.newBuilder()
+                    .uri(URI.create("http://localhost:" + TEST_PORT + "/api/clientes/" + cliente.getId() + "?forcar=true"))
+                    .DELETE()
+                    .build(),
+                HttpResponse.BodyHandlers.ofString()
+            );
+            assert delClienteForcadoResp.statusCode() == 200 : "DELETE /api/clientes/{id}?forcar=true deve retornar HTTP 200";
+            assert clienteService.listarTodos().isEmpty() : "Cliente deveria ter sido removido após confirmação forçada";
+            assert precificacaoService.listarTodos().isEmpty() : "Serviços e etapas deveriam ter sido removidos em cascata";
+            assert orcamentoService.listarTodos().isEmpty() : "Orçamentos deveriam ter sido removidos em cascata";
+            assert cobrancaService.listarTodas().isEmpty() : "Cobranças deveriam ter sido removidas em cascata";
+            System.out.println("[OK] NexumServer: Exclusão de cliente em 2 etapas (HTTP 409 -> HTTP 200 com ?forcar=true em cascata) validada.");
+
         } finally {
             NexumServer.stop();
             ConnectionFactory.setDbPath("database/nexum.db");

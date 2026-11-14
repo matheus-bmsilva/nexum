@@ -59,8 +59,17 @@ public class ClienteController implements HttpHandler {
             } else if ("DELETE".equals(method)) {
                 if (path.matches("^/api/clientes/\\d+$")) {
                     int id = Integer.parseInt(path.substring(path.lastIndexOf('/') + 1));
-                    clienteService.deletar(id);
-                    HttpHelper.sendJson(exchange, 200, "{\"success\": true}");
+                    boolean forcar = isExclusaoForcada(exchange.getRequestURI().getQuery());
+
+                    if (!forcar && clienteService.possuiVinculos(id)) {
+                        String msg = HttpHelper.escapeJson(ClienteService.MENSAGEM_AVISO_VINCULOS);
+                        String jsonConflito = "{\"error\": \"" + msg + "\", \"erro\": \"" + msg + "\", \"possuiVinculos\": true}";
+                        HttpHelper.sendJson(exchange, 409, jsonConflito);
+                        return;
+                    }
+
+                    clienteService.deletar(id, forcar);
+                    HttpHelper.sendJson(exchange, 200, "{\"success\": true, \"removidoEmCascata\": " + forcar + "}");
                 } else {
                     HttpHelper.sendError(exchange, 400, "ID do cliente não informado.");
                 }
@@ -74,5 +83,22 @@ public class ClienteController implements HttpHandler {
         } catch (Exception e) {
             HttpHelper.sendError(exchange, 500, "Erro interno no servidor ao processar cliente: " + e.getMessage());
         }
+    }
+
+    private boolean isExclusaoForcada(String query) {
+        if (query == null || query.isBlank()) {
+            return false;
+        }
+        for (String param : query.split("&")) {
+            String[] kv = param.split("=", 2);
+            if (kv.length == 2) {
+                String key = kv[0].trim().toLowerCase();
+                String val = kv[1].trim().toLowerCase();
+                if (("forcar".equals(key) || "cascade".equals(key)) && "true".equals(val)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 }
